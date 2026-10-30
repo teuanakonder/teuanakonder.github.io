@@ -1,0 +1,165 @@
+:root {
+  --bg-dark: #090d16;
+  --numerator-bg: #ffffff;
+  --numerator-text: #0f172a;
+  --denominator-bg-start: #1e40af;
+  --denominator-bg-end: #2563eb;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  background-color: var(--bg-dark);
+  color: #f8fafc;
+}
+
+/* Фоновые светящиеся сферы */
+.bg-orb {
+  position: fixed;
+  border-radius: 50%;
+  filter: blur(110px);
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.35;
+  animation: floatOrb 18s ease-in-out infinite alternate;
+}
+
+.orb-1 {
+  width: 420px;
+  height: 420px;
+  background: radial-gradient(circle, #3b82f6 0%, transparent 70%);
+  top: -120px;
+  left: -100px;
+}
+
+.orb-2 {
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, #6366f1 0%, transparent 70%);
+  bottom: -160px;
+  right: -120px;
+  animation-delay: -9s;
+}
+
+@keyframes floatOrb {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    transform: translate(40px, 30px) scale(1.12);
+  }
+}
+
+/* Эффект матового стекла */
+.glass-header {
+  background: rgba(15, 23, 42, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.glass-panel {
+  background: rgba(30, 41, 59, 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+}
+
+/* Карточка Числителя (Белая) */
+.card-numerator {
+  background-color: var(--numerator-bg);
+  color: var(--numerator-text);
+  border-left: 6px solid #94a3b8;
+  box-shadow: 0 8px 20px -4px rgba(255, 255, 255, 0.08);
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s ease;
+}
+
+.card-numerator:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 28px -6px rgba(255, 255, 255, 0.16);
+}
+
+/* Карточка Знаменателя (Синяя) */
+.card-denominator {
+  background: linear-gradient(135deg, var(--denominator-bg-start) 0%, var(--denominator-bg-end) 100%);
+  color: #ffffff;
+  border-left: 6px solid #93c5fd;
+  box-shadow: 0 8px 22px -4px rgba(37, 99, 235, 0.4);
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s ease;
+}
+
+.card-denominator:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 30px -6px rgba(59, 130, 246, 0.6);
+}
+
+/* Каскадная анимация появления дней недели */
+@keyframes fadeSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(22px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.day-card-animate {
+  opacity: 0;
+  animation: fadeSlideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Активная кнопка фильтра */
+.active-filter {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+/* Пульсирующий индикатор загрузки */
+.loader-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #38bdf8;
+  display: inline-block;
+  animation: pulseDot 1.2s infinite ease-in-out;
+}
+
+@keyframes pulseDot {
+  0%, 100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 1;
+  }
+}
+
+/* Модальное окно Админ-панели */
+.modal-backdrop {
+  background: rgba(9, 13, 22, 0.78);
+  backdrop-filter: blur(8px);
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+.modal-content {
+  animation: modalPop 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalPop {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
