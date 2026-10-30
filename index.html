@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Расписание занятий — Интерактивный портал</title>
+  <!-- Tailwind CSS для базовой сетки -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Шрифт Inter -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Наши кастомные стили и анимации -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="min-h-screen pb-20 relative overflow-x-hidden">
+
+  <!-- Анимированные фоновые сферы -->
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+
+  <!-- Шапка -->
+  <header class="sticky top-0 z-30 glass-header">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span id="course-badge" class="px-3 py-0.5 text-xs font-bold rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 tracking-wide">
+            3 КУРС • ОФО
+          </span>
+          <span id="current-date-badge" class="text-xs text-slate-400 font-medium"></span>
+        </div>
+        <h1 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white mt-1">
+          Расписание учебных занятий
+        </h1>
+      </div>
+
+      <!-- Индикатор недель и кнопка Админ-панели -->
+      <div class="flex flex-wrap items-center gap-2.5">
+        <div id="this-week-banner" class="px-3.5 py-2 rounded-xl text-xs font-medium flex items-center gap-2 transition-all duration-300">
+          <span>Эта неделя:</span>
+          <strong id="this-week-label" class="text-sm">...</strong>
+        </div>
+        <div id="next-week-banner" class="px-3.5 py-2 rounded-xl text-xs font-medium flex items-center gap-2 transition-all duration-300">
+          <span>Следующая:</span>
+          <strong id="next-week-label" class="text-sm">...</strong>
+        </div>
+
+        <button id="open-admin-btn" class="ml-auto md:ml-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-800/90 hover:bg-indigo-600 text-slate-200 hover:text-white border border-slate-700 hover:border-indigo-400 transition-all duration-300 flex items-center gap-2 shadow-lg">
+          <span>⚙️</span>
+          <span>Админ-панель</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Панель управления (Курс, Группа, Фильтр) -->
+  <section class="max-w-6xl mx-auto px-4 mt-6 relative z-10">
+    <div class="glass-panel rounded-2xl p-4 md:p-5 flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between">
+      
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
+        <!-- Выбор курса -->
+        <div class="flex flex-col flex-1 sm:max-w-[220px]">
+          <label for="course-select" class="text-[11px] uppercase tracking-wider font-semibold text-slate-400 mb-1">
+            Курс / Таблица
+          </label>
+          <select id="course-select" class="custom-select w-full bg-slate-900/90 border border-slate-700 text-white text-sm rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-500 transition">
+          </select>
+        </div>
+
+        <!-- Выбор группы -->
+        <div class="flex flex-col flex-1 sm:max-w-[240px]">
+          <label for="group-select" class="text-[11px] uppercase tracking-wider font-semibold text-slate-400 mb-1">
+            Учебная группа
+          </label>
+          <select id="group-select" class="custom-select w-full bg-slate-900/90 border border-slate-700 text-white text-sm rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-500 transition">
+          </select>
+        </div>
+      </div>
+
+      <!-- Фильтр Числитель / Знаменатель -->
+      <div class="flex flex-col">
+        <span class="text-[11px] uppercase tracking-wider font-semibold text-slate-400 mb-1 hidden lg:block">
+          Режим отображения
+        </span>
+        <div class="flex flex-wrap items-center gap-2">
+          <button data-filter="all" class="filter-btn active-filter px-4 py-2.5 rounded-xl text-xs font-bold bg-slate-800 text-white border border-slate-700 transition-all">
+            Обе недели
+          </button>
+          <button data-filter="numerator" class="filter-btn px-4 py-2.5 rounded-xl text-xs font-bold bg-white text-slate-900 hover:bg-slate-100 transition-all flex items-center gap-2 shadow">
+            <span class="w-2.5 h-2.5 rounded-full bg-slate-900 inline-block"></span>
+            Числитель (Белый)
+          </button>
+          <button data-filter="denominator" class="filter-btn px-4 py-2.5 rounded-xl text-xs font-bold bg-blue-600 text-white hover:bg-blue-500 transition-all flex items-center gap-2 shadow">
+            <span class="w-2.5 h-2.5 rounded-full bg-blue-200 inline-block"></span>
+            Знаменатель (Синий)
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Статус и Легенда -->
+    <div class="flex flex-wrap items-center justify-between gap-4 mt-4 px-2 text-xs text-slate-400">
+      <div class="flex items-center gap-5">
+        <span class="flex items-center gap-2">
+          <span class="w-3.5 h-3.5 rounded bg-white border border-slate-300 inline-block shadow-sm"></span>
+          Числитель — белый цвет
+        </span>
+        <span class="flex items-center gap-2">
+          <span class="w-3.5 h-3.5 rounded bg-blue-600 inline-block shadow-sm"></span>
+          Знаменатель — синий цвет
+        </span>
+      </div>
+      <div id="status-message" class="text-slate-300 font-medium flex items-center gap-2">
+        <span class="loader-dot"></span>
+        <span>Загрузка данных...</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Контейнер расписания -->
+  <main id="schedule-container" class="max-w-6xl mx-auto px-4 mt-6 grid grid-cols-1 gap-6 relative z-10">
+    <!-- Карточки дней рендерятся через app.js -->
+  </main>
+
+  <!-- МОДАЛЬНОЕ ОКНО АДМИН-ПАНЕЛИ -->
+  <div id="admin-modal" class="modal-backdrop hidden fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div class="modal-content glass-panel w-full max-w-2xl rounded-3xl p-6 sm:p-8 border border-slate-700 shadow-2xl max-h-[90vh] overflow-y-auto">
+      
+      <div class="flex items-center justify-between pb-4 border-b border-slate-700/80">
+        <div>
+          <h2 class="text-xl font-bold text-white flex items-center gap-2">
+            <span>⚙️</span> Управление расписаниями и курсами
+          </h2>
+          <p class="text-xs text-slate-400 mt-1">
+            Добавляйте ссылки на Google Таблицы для других курсов и списки групп (листов таблицы).
+          </p>
+        </div>
+        <button id="close-admin-btn" class="w-9 h-9 rounded-xl bg-slate-800 hover:bg-rose-600/80 text-slate-300 hover:text-white transition flex items-center justify-center text-lg font-bold">
+          ✕
+        </button>
+      </div>
+
+      <!-- Форма добавления / обновления курса -->
+      <form id="admin-form" class="mt-5 space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1.5">
+              Название курса / потока *
+            </label>
+            <input id="admin-course-name" type="text" required placeholder="Например: 2 курс (ОФО)" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500" />
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1.5">
+              Ссылка на Google Таблицу *
+            </label>
+            <input id="admin-sheet-url" type="url" required placeholder="https://docs.google.com/spreadsheets/d/..." class="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">
+            Группы (названия листов в таблице через запятую) *
+          </label>
+          <textarea id="admin-groups-list" rows="2" required placeholder="241Р01 ИНФ, 241Р71 Эконом, 241Р91 Архитектура" class="w-full bg-slate-900/90 border border-slate-700 rounded-xl px-3.5 py-2.5 text-sm text-white focus:outline-none focus:border-indigo-500"></textarea>
+          <p class="text-[11px] text-slate-400 mt-1">
+            Важно: название каждой группы должно в точности совпадать с именем вкладки (листа) внизу Google Таблицы.
+          </p>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
+          <button type="button" id="test-sheet-btn" class="px-4 py-2.5 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 transition">
+            🔍 Проверить связь с таблицей
+          </button>
+          <button type="submit" class="px-5 py-2.5 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-500 text-white shadow-lg shadow-indigo-600/30 transition">
+            ➕ Сохранить курс и группы
+          </button>
+        </div>
+        <div id="admin-feedback" class="text-xs font-medium hidden rounded-xl p-3"></div>
+      </form>
+
+      <!-- Список существующих курсов -->
+      <div class="mt-7 pt-5 border-t border-slate-700/80">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm font-bold text-white">Подключённые курсы и таблицы</h3>
+          <button id="reset-defaults-btn" class="text-[11px] text-rose-400 hover:underline">
+            Сбросить к стандартным
+          </button>
+        </div>
+        <div id="admin-courses-list" class="space-y-2.5">
+          <!-- Рендерится динамически -->
+        </div>
+      </div>
+
+      <!-- Экспорт для GitHub Pages -->
+      <div class="mt-6 pt-4 border-t border-slate-700/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-900/60 p-4 rounded-2xl border border-slate-800">
+        <div class="text-xs text-slate-400">
+          <strong class="text-slate-200 block mb-0.5">Хотите, чтобы новые курсы видели все пользователи GitHub Pages?</strong>
+          Скопируйте готовый JSON-код настроек и вставьте его в начало файла <code>app.js</code>.
+        </div>
+        <button id="copy-config-btn" class="shrink-0 px-3.5 py-2 rounded-xl text-xs font-bold bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 border border-emerald-500/30 transition">
+          📋 Скопировать конфиг
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Основная логика -->
+  <script src="app.js"></script>
+</body>
+</html>
