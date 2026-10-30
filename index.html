@@ -317,18 +317,23 @@ input::placeholder,textarea::placeholder{color:#8A86AE}
 
         <div>
           <label class="block text-xs muted mb-1.5">
-            Группы (названия листов в таблице через запятую) *
+            Группы (необязательно — подтягиваются из таблицы автоматически)
           </label>
-          <textarea id="admin-groups-list" rows="2" required placeholder="241Р01 ИНФ, 241Р71 Эконом, 241Р91 Архитектура" class="w-full border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none"></textarea>
+          <textarea id="admin-groups-list" rows="2" placeholder="Оставьте пустым — список возьмётся из вкладок таблицы. Или впишите вручную: 241Р01 ИНФ, 241Р71 Эконом" class="w-full border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none"></textarea>
           <p class="text-[11px] muted mt-1">
-            Важно: название каждой группы должно в точности совпадать с именем вкладки (листа) внизу Google Таблицы.
+            Каждая вкладка (лист) таблицы = одна группа. Новые вкладки появятся у всех пользователей автоматически. Ручной список используется только как запасной, если таблицу прочитать не удалось.
           </p>
         </div>
 
         <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
-          <button type="button" id="test-sheet-btn" class="px-4 py-2.5 rounded-xl text-xs muted border btn v-soft">
-            <span class="ico">🔍</span> Проверить связь с таблицей
-          </button>
+          <div class="flex flex-wrap gap-2">
+            <button type="button" id="test-sheet-btn" class="px-4 py-2.5 rounded-xl text-xs muted border btn v-soft">
+              <span class="ico">🔍</span> Проверить связь
+            </button>
+            <button type="button" id="load-groups-btn" class="px-4 py-2.5 rounded-xl text-xs muted border btn v-soft">
+              <span class="ico">🔄</span> Подтянуть группы
+            </button>
+          </div>
           <button type="submit" class="px-5 py-2.5 rounded-xl text-xs btn v-main">
             <span class="ico">➕</span> Сохранить курс и группы
           </button>
@@ -340,6 +345,9 @@ input::placeholder,textarea::placeholder{color:#8A86AE}
       <div class="mt-7 pt-5 border-t">
         <div class="flex items-center justify-between mb-3">
           <h3 class="text-sm">Подключённые курсы и таблицы</h3>
+          <button id="refresh-groups-btn" class="text-[11px] btn v-link">
+            <span class="ico">🔄</span> Обновить группы
+          </button>
           <button id="reset-defaults-btn" class="text-[11px] btn v-link">
             Сбросить к стандартным
           </button>
@@ -352,8 +360,8 @@ input::placeholder,textarea::placeholder{color:#8A86AE}
       <!-- Экспорт для GitHub Pages -->
       <div class="mt-6 pt-4 border-t flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 export-box p-4 rounded-2xl">
         <div class="text-xs muted">
-          <strong class="muted block mb-0.5">Хотите, чтобы новые курсы видели все пользователи GitHub Pages?</strong>
-          Скопируйте готовый JSON-код настроек и вставьте его в начало тега <code>&lt;script&gt;</code> файла <code>index.html</code>.
+          <strong class="muted block mb-0.5">Хотите, чтобы новый курс видели все пользователи?</strong>
+          Группы внутри курса и так подгружаются у всех из таблицы. А сам курс добавленный здесь виден только в этом браузере: скопируйте конфиг и вставьте его вместо <code>DEFAULT_COURSES</code> в начале <code>&lt;script&gt;</code> файла <code>index.html</code>.
         </div>
         <button id="copy-config-btn" class="shrink-0 px-3.5 py-2 rounded-xl text-xs border btn v-mint">
           <span class="ico">📋</span><span class="lbl">Скопировать конфиг</span>
@@ -493,11 +501,48 @@ function sha256(msg) {
 }
 const credentialsValid = (login, pass) => sha256(AUTH_SALT + login.trim().toLowerCase() + '::' + pass) === AUTH_HASH;
 
+/* ===== Бэкенд (Google Apps Script) =====
+   Хранит общий список курсов и сам определяет группы по вкладкам таблиц — для ВСЕХ пользователей.
+   Инструкция по развёртыванию — в файле backend/Code.gs. Вставьте сюда адрес веб-приложения (…/exec).
+   Если оставить пустым — сайт работает по-старому, без общего хранилища. */
+const BACKEND_URL = '';
+const STORAGE_KEY_TOKEN = 'schedule_portal_admin_token';
+const STORAGE_KEY_REMOTE = 'schedule_portal_remote_cfg_v1';
+
+const getToken = () => { try { return sessionStorage.getItem(STORAGE_KEY_TOKEN) || ''; } catch (e) { return ''; } };
 let isAdmin = false;
-try { isAdmin = sessionStorage.getItem(STORAGE_KEY_AUTH) === '1'; } catch (e) {}
-function setAdmin(on) {
+try { isAdmin = sessionStorage.getItem(STORAGE_KEY_AUTH) === '1' && (!BACKEND_URL || !!getToken()); } catch (e) {}
+function setAdmin(on, token) {
   isAdmin = on;
-  try { on ? sessionStorage.setItem(STORAGE_KEY_AUTH, '1') : sessionStorage.removeItem(STORAGE_KEY_AUTH); } catch (e) {}
+  try {
+    on ? sessionStorage.setItem(STORAGE_KEY_AUTH, '1') : sessionStorage.removeItem(STORAGE_KEY_AUTH);
+    if (on && token) sessionStorage.setItem(STORAGE_KEY_TOKEN, token);
+    if (!on) sessionStorage.removeItem(STORAGE_KEY_TOKEN);
+  } catch (e) {}
+}
+
+// JSONP-запрос (чтение с бэкенда без проблем с CORS)
+function jsonp(url, timeoutMs = 15000) {
+  return new Promise((resolve, reject) => {
+    const cb = 'bk_' + Math.random().toString(36).slice(2, 9);
+    const sc = document.createElement('script');
+    const timer = setTimeout(() => { cleanup(); reject(new Error('timeout')); }, timeoutMs);
+    function cleanup() { clearTimeout(timer); delete window[cb]; sc.remove(); }
+    window[cb] = d => { cleanup(); resolve(d); };
+    sc.onerror = () => { cleanup(); reject(new Error('network')); };
+    sc.src = url + (url.includes('?') ? '&' : '?') + 'callback=' + cb;
+    document.body.appendChild(sc);
+  });
+}
+// Запись на бэкенд (text/plain — «простой» запрос без preflight)
+async function backendPost(payload) {
+  const res = await fetch(BACKEND_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload),
+    redirect: 'follow'
+  });
+  return res.json();
 }
 
 /**
@@ -523,6 +568,18 @@ const DEFAULT_COURSES = [
   }
 ];
 
+/* ===== Автоподгрузка групп из Google Таблицы =====
+   Способ 1 (рекомендуется): ключ Google Sheets API — группы = названия всех видимых вкладок таблицы.
+     Как получить: console.cloud.google.com → включить «Google Sheets API» → «Учётные данные» → «API-ключ».
+     Ограничьте ключ: только Google Sheets API + HTTP-реферер вашего сайта (https://ваш-логин.github.io/*).
+   Способ 2 (без ключа): создайте в таблице вкладку «Группы»: в A1 слово «Группы», ниже по одной группе в строке.
+   Таблица должна быть открыта: «Все, у кого есть ссылка → Читатель». */
+const GOOGLE_API_KEY = '';              // ← вставьте API-ключ сюда
+const GROUPS_TAB_NAME = 'Группы';       // служебная вкладка со списком групп (способ 2)
+const EXCLUDED_TABS = ['Лист1', 'Sheet1', 'Настройки', 'Служебный'];  // вкладки, которые не являются группами
+const GROUPS_REFRESH_MS = 5 * 60 * 1000; // как часто перепроверять таблицу
+
+const STORAGE_KEY_GROUPS = 'schedule_portal_groups_cache_v1';
 const STORAGE_KEY_COURSES = 'schedule_portal_courses_v2';
 const STORAGE_KEY_SELECTED_COURSE = 'schedule_portal_selected_course';
 const STORAGE_KEY_SELECTED_GROUP = 'schedule_portal_selected_group';
@@ -535,19 +592,42 @@ let cachedScheduleData = [];
 
 // 1. Загрузка и сохранение конфигурации курсов
 function loadConfig() {
+  // Курсы из кода (DEFAULT_COURSES) одинаковы для всех пользователей и всегда актуальны.
+  // Из localStorage берутся только курсы, добавленные в админ-панели на этом устройстве.
+  const defaults = JSON.parse(JSON.stringify(DEFAULT_COURSES));
+  if (BACKEND_URL) {
+    // Общий список курсов с сервера (последняя копия — для мгновенного показа)
+    try {
+      const cached = JSON.parse(localStorage.getItem(STORAGE_KEY_REMOTE) || 'null');
+      if (Array.isArray(cached) && cached.length) { coursesConfig = cached; return; }
+    } catch (e) {}
+    coursesConfig = defaults;
+    return;
+  }
+  let custom = [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY_COURSES);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        coursesConfig = parsed;
-        return;
-      }
+    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY_COURSES) || '[]');
+    if (Array.isArray(parsed)) {
+      custom = parsed.filter(c => c && c.id && c.sheetUrl && Array.isArray(c.groups) && !defaults.some(d => d.id === c.id));
     }
   } catch (e) {
     console.warn('Ошибка чтения localStorage, используем стандартный конфиг');
   }
-  coursesConfig = JSON.parse(JSON.stringify(DEFAULT_COURSES));
+  coursesConfig = defaults.concat(custom);
+}
+
+// Кэш групп, найденных в таблицах (чтобы список появлялся мгновенно)
+let groupsCache = {};
+function loadGroupsCache() {
+  try { groupsCache = JSON.parse(localStorage.getItem(STORAGE_KEY_GROUPS) || '{}') || {}; } catch (e) { groupsCache = {}; }
+}
+function saveGroupsCache() {
+  try { localStorage.setItem(STORAGE_KEY_GROUPS, JSON.stringify(groupsCache)); } catch (e) {}
+}
+function getGroups(course) {
+  if (!course) return [];
+  const cached = groupsCache[course.sheetUrl];
+  return (cached && cached.length) ? cached : (course.groups || []);
 }
 
 function saveConfig() {
@@ -600,7 +680,7 @@ function renderWeekBanners() {
 }
 
 // 3. Загрузка данных из Google Таблицы через JSONP (работает без CORS на GitHub Pages)
-function fetchSheetData(baseSheetUrl, sheetName) {
+function fetchSheetData(baseSheetUrl, sheetName, extraParams = '') {
   return new Promise((resolve, reject) => {
     const callbackName = 'gvizCb_' + Math.random().toString(36).substring(2, 9);
     const script = document.createElement('script');
@@ -629,9 +709,132 @@ function fetchSheetData(baseSheetUrl, sheetName) {
       reject(new Error('Ошибка подключения к Google Таблицам'));
     };
 
-    script.src = `${baseSheetUrl}/gviz/tq?tqx=out:json;responseHandler:${callbackName}&sheet=${encodeURIComponent(sheetName)}`;
+    script.src = `${baseSheetUrl}/gviz/tq?tqx=out:json;responseHandler:${callbackName}&sheet=${encodeURIComponent(sheetName)}${extraParams ? '&' + extraParams : ''}`;
     document.body.appendChild(script);
   });
+}
+
+// 3.1 Автоопределение групп по таблице
+const isServiceTab = t => {
+  const n = t.trim().toLowerCase();
+  return n === GROUPS_TAB_NAME.toLowerCase() || EXCLUDED_TABS.some(x => x.toLowerCase() === n);
+};
+
+async function discoverGroups(baseUrl) {
+  const idMatch = baseUrl.match(/\/d\/([a-zA-Z0-9-_]+)/);
+
+  // Через бэкенд: ключ не нужен, сервер сам читает вкладки таблицы
+  if (BACKEND_URL) {
+    try {
+      const r = await jsonp(BACKEND_URL + '?action=groups&url=' + encodeURIComponent(baseUrl));
+      if (r && r.ok && r.groups && r.groups.length) return { groups: r.groups, source: 'backend' };
+    } catch (err) {
+      console.warn('Бэкенд не вернул группы:', err);
+    }
+  }
+
+  // Способ 1: Google Sheets API — названия вкладок
+  if (GOOGLE_API_KEY && idMatch) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 10000);
+    try {
+      const url = `https://sheets.googleapis.com/v4/spreadsheets/${idMatch[1]}?fields=sheets.properties(title,hidden,sheetType)&key=${encodeURIComponent(GOOGLE_API_KEY)}`;
+      const res = await fetch(url, { signal: ctrl.signal });
+      if (!res.ok) throw new Error('Sheets API: HTTP ' + res.status);
+      const data = await res.json();
+      const titles = (data.sheets || [])
+        .map(x => x.properties)
+        .filter(p => p && !p.hidden && (!p.sheetType || p.sheetType === 'GRID'))
+        .map(p => String(p.title).trim())
+        .filter(t => t && !isServiceTab(t));
+      if (titles.length) return { groups: [...new Set(titles)], source: 'api' };
+    } catch (err) {
+      console.warn('Не удалось получить вкладки через Sheets API:', err);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  // Способ 2: служебная вкладка «Группы» (без ключа)
+  try {
+    const table = await fetchSheetData(baseUrl, GROUPS_TAB_NAME, 'headers=0');
+    const label = String(((table.cols || [])[0] || {}).label || '').trim();
+    const vals = (table.rows || []).map(r => {
+      const c = (r.c || [])[0];
+      return c && c.v !== null && c.v !== undefined ? String(c.v).trim() : '';
+    });
+    const head = GROUPS_TAB_NAME.toLowerCase();
+    // Если такой вкладки нет, Google отдаёт первый лист — отсекаем по заголовку A1
+    if ([label, vals[0]].some(v => (v || '').toLowerCase() === head)) {
+      const groups = [...new Set(vals.filter(v => v && v.toLowerCase() !== head))];
+      if (groups.length) return { groups, source: 'tab' };
+    }
+  } catch (err) {
+    console.warn('Вкладка «' + GROUPS_TAB_NAME + '» недоступна:', err);
+  }
+  return null;
+}
+
+async function refreshGroups(course) {
+  const found = await discoverGroups(course.sheetUrl);
+  if (!found) return false;
+  const changed = JSON.stringify(groupsCache[course.sheetUrl] || []) !== JSON.stringify(found.groups);
+  groupsCache[course.sheetUrl] = found.groups;
+  saveGroupsCache();
+  return changed;
+}
+
+// Загрузка общего списка курсов и актуальных групп с бэкенда
+async function syncFromBackend() {
+  let data;
+  try { data = await jsonp(BACKEND_URL + '?action=config'); } catch (err) { console.warn('Бэкенд недоступен:', err); return; }
+  if (!data || !data.ok) { console.warn('Бэкенд вернул ошибку:', data && data.error); return; }
+
+  const before = JSON.stringify([coursesConfig, groupsCache]);
+  const remote = (data.courses || []).filter(c => c && c.id && c.name && c.sheetUrl);
+  const list = remote.length ? remote : JSON.parse(JSON.stringify(DEFAULT_COURSES));
+  coursesConfig = list.map(c => ({ id: String(c.id), name: String(c.name), sheetUrl: c.sheetUrl, groups: c.groups || [] }));
+  remote.forEach(c => { if (c.liveGroups && c.liveGroups.length) groupsCache[c.sheetUrl] = c.liveGroups; });
+  saveGroupsCache();
+  try { localStorage.setItem(STORAGE_KEY_REMOTE, JSON.stringify(coursesConfig)); } catch (e) {}
+  if (JSON.stringify([coursesConfig, groupsCache]) === before) return;
+
+  const prevCourse = currentCourse && currentCourse.id, prevGroup = currentGroup;
+  populateCourseAndGroupSelects();
+  if (!currentCourse || currentCourse.id !== prevCourse || currentGroup !== prevGroup) loadCurrentSchedule();
+  if ($('admin-modal').classList.contains('open')) renderAdminCoursesList();
+}
+
+const syncAll = () => (BACKEND_URL ? syncFromBackend() : refreshAllGroups());
+
+// Сохранение списка курсов: на сервер (для всех) или локально, если бэкенд не задан
+async function persistCourses() {
+  if (!BACKEND_URL) { saveConfig(); return; }
+  const r = await backendPost({
+    action: 'save',
+    token: getToken(),
+    courses: coursesConfig.map(c => ({ id: c.id, name: c.name, sheetUrl: c.sheetUrl, groups: getGroups(c) }))
+  });
+  if (!r || !r.ok) {
+    if (r && r.error === 'auth') {
+      setAdmin(false);
+      closeModal($('admin-modal'));
+      toast('Сессия истекла. Войдите в админ-панель заново.', 'err', '🔒');
+    }
+    throw new Error((r && r.error) || 'save_failed');
+  }
+  try { localStorage.setItem(STORAGE_KEY_REMOTE, JSON.stringify(coursesConfig)); } catch (e) {}
+}
+
+async function refreshAllGroups() {
+  const results = await Promise.all(coursesConfig.map(c => refreshGroups(c).then(changed => ({ c, changed }))));
+  if (!results.some(r => r.changed)) return;
+  if (currentCourse && results.some(r => r.changed && r.c.sheetUrl === currentCourse.sheetUrl)) {
+    const before = currentGroup;
+    populateGroupSelect();
+    if (currentGroup !== before) loadCurrentSchedule();
+  }
+  if ($('admin-modal').classList.contains('open')) renderAdminCoursesList();
 }
 
 // 4. Парсер объединённых ячеек (1-я строка времени — Числитель, 2-я строка — Знаменатель)
@@ -811,7 +1014,7 @@ function populateCourseAndGroupSelects() {
 
 function populateGroupSelect() {
   const groupSelect = document.getElementById('group-select');
-  const groups = currentCourse ? currentCourse.groups : [];
+  const groups = getGroups(currentCourse);
 
   groupSelect.innerHTML = groups.map(g =>
     `<option value="${esc(g)}">${esc(g)}</option>`
@@ -863,7 +1066,7 @@ function renderAdminCoursesList() {
     <div class="course-item ${course.id === flashId ? 'flash' : ''} p-3.5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3" style="--d:${i * 70}ms">
       <div>
         <div class="text-sm">${esc(course.name)}</div>
-        <div class="text-[11px] muted mt-0.5">Групп: ${course.groups.length} (${esc(course.groups.join(', '))})</div>
+        <div class="text-[11px] muted mt-0.5">Групп: ${getGroups(course).length} (${esc(getGroups(course).join(', '))})${groupsCache[course.sheetUrl] ? ' • 🔄 из таблицы' : ''}</div>
       </div>
       <div class="flex items-center gap-2 shrink-0">
         <button data-edit-id="${esc(course.id)}" class="edit-course-btn btn v-soft px-3 py-1.5 rounded-lg text-xs"><span class="ico">✏️</span> Изменить</button>
@@ -878,7 +1081,7 @@ function renderAdminCoursesList() {
       if (!target) return;
       $('admin-course-name').value = target.name;
       $('admin-sheet-url').value = target.sheetUrl;
-      $('admin-groups-list').value = target.groups.join(', ');
+      $('admin-groups-list').value = getGroups(target).join(', ');
       const form = $('admin-form');
       form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       restart(form, 'form-flash');
@@ -888,9 +1091,17 @@ function renderAdminCoursesList() {
   listEl.querySelectorAll('.delete-course-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       btn.closest('.course-item').classList.add('removing');
-      setTimeout(() => {
+      setTimeout(async () => {
+        const backup = coursesConfig;
         coursesConfig = coursesConfig.filter(c => c.id !== btn.dataset.deleteId);
-        saveConfig();
+        try {
+          await persistCourses();
+        } catch (err) {
+          coursesConfig = backup;
+          renderAdminCoursesList();
+          toast('Не удалось удалить курс на сервере', 'err', '⚠️');
+          return;
+        }
         populateCourseAndGroupSelects();
         renderAdminCoursesList();
         loadCurrentSchedule();
@@ -911,9 +1122,14 @@ function showAdminFeedback(message, isSuccess = true) {
 // 8. Инициализация приложения
 document.addEventListener('DOMContentLoaded', () => {
   loadConfig();
+  loadGroupsCache();
   renderWeekBanners();
   populateCourseAndGroupSelects();
   loadCurrentSchedule();
+  syncAll();                                            // сразу сверяем курсы и группы с сервером/таблицей
+  setInterval(syncAll, GROUPS_REFRESH_MS);              // и периодически
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) syncAll(); });
+  if (BACKEND_URL) { const box = document.querySelector('.export-box'); if (box) box.style.display = 'none'; }
 
   // Переключение курса
   document.getElementById('course-select').addEventListener('change', (e) => {
@@ -977,28 +1193,40 @@ document.addEventListener('DOMContentLoaded', () => {
     loginPass.focus();
   });
 
-  loginForm.addEventListener('submit', e => {
+  loginForm.addEventListener('submit', async e => {
     e.preventDefault();
     setLoading(loginSubmit, true);
     loginError.classList.remove('show');
-    setTimeout(() => {
-      setLoading(loginSubmit, false);
-      if (credentialsValid(loginUser.value, loginPass.value)) {
-        setAdmin(true);
-        loginSubmit.classList.add('v-ok');
-        loginSubmit.querySelector('.lbl').textContent = 'Готово!';
-        const lock = $('login-lock');
-        lock.textContent = '🔓';
-        restart(lock, 'pop');
-        setTimeout(() => { closeModal(loginModal); setTimeout(() => { openAdmin(); toast('Добро пожаловать в админ-панель', 'ok', '🔓'); }, 240); }, 650);
-      } else {
-        loginError.textContent = 'Неверный логин или пароль. Проверьте раскладку и регистр.';
-        loginError.classList.add('show');
-        restart(loginModal.querySelector('.modal-content'), 'shake');
-        loginPass.value = '';
-        loginPass.focus();
+    let ok = false, token = '', errMsg = '';
+    if (BACKEND_URL) {
+      // Пароль проверяет сервер; в браузере он нигде не хранится
+      try {
+        const r = await backendPost({ action: 'login', login: loginUser.value, password: loginPass.value });
+        ok = !!(r && r.ok); token = ok ? r.token : '';
+        if (r && r.error === 'locked') errMsg = 'Слишком много неудачных попыток. Попробуйте через 10 минут.';
+      } catch (err) {
+        errMsg = 'Нет связи с сервером. Проверьте интернет и BACKEND_URL.';
       }
-    }, 500);
+    } else {
+      await new Promise(r => setTimeout(r, 500));
+      ok = credentialsValid(loginUser.value, loginPass.value);
+    }
+    setLoading(loginSubmit, false);
+    if (ok) {
+      setAdmin(true, token);
+      loginSubmit.classList.add('v-ok');
+      loginSubmit.querySelector('.lbl').textContent = 'Готово!';
+      const lock = $('login-lock');
+      lock.textContent = '🔓';
+      restart(lock, 'pop');
+      setTimeout(() => { closeModal(loginModal); setTimeout(() => { openAdmin(); toast('Добро пожаловать в админ-панель', 'ok', '🔓'); }, 240); }, 650);
+    } else {
+      loginError.textContent = errMsg || 'Неверный логин или пароль. Проверьте раскладку и регистр.';
+      loginError.classList.add('show');
+      restart(loginModal.querySelector('.modal-content'), 'shake');
+      loginPass.value = '';
+      loginPass.focus();
+    }
   });
 
   $('logout-btn').addEventListener('click', () => {
@@ -1007,78 +1235,148 @@ document.addEventListener('DOMContentLoaded', () => {
     toast('Вы вышли из админ-панели', 'info', '🚪');
   });
 
+  // Подсказка при неудачном автоопределении
+  const NO_DISCOVERY_HINT = BACKEND_URL
+    ? 'Проверьте, что у владельца скрипта есть доступ к этой таблице.'
+    : GOOGLE_API_KEY
+    ? 'Проверьте, что таблица открыта по ссылке и ключ разрешён для Google Sheets API.'
+    : 'Задайте GOOGLE_API_KEY в коде или создайте в таблице вкладку «' + GROUPS_TAB_NAME + '» (A1 — «' + GROUPS_TAB_NAME + '», ниже группы по одной в строке).';
+
   // Проверка связи с таблицей в Админ-панели
   $('test-sheet-btn').addEventListener('click', async (e) => {
     const btn = e.currentTarget;
     const baseUrl = normalizeSheetBaseUrl($('admin-sheet-url').value);
-    const firstGroup = $('admin-groups-list').value.split(',').map(s => s.trim()).filter(Boolean)[0];
-
-    if (!baseUrl || !firstGroup) {
-      showAdminFeedback('Укажите корректную ссылку на Google Таблицу и хотя бы одну группу.', false);
+    if (!baseUrl) {
+      showAdminFeedback('Укажите корректную ссылку на Google Таблицу.', false);
       return;
     }
-
-    showAdminFeedback(`Проверяем доступ к листу «${firstGroup}»...`, true);
     setLoading(btn, true);
+    showAdminFeedback('Проверяем доступ к таблице...', true);
     try {
+      let firstGroup = $('admin-groups-list').value.split(',').map(s => s.trim()).filter(Boolean)[0];
+      if (!firstGroup) {
+        const found = await discoverGroups(baseUrl);
+        firstGroup = found && found.groups[0];
+      }
+      if (!firstGroup) {
+        showAdminFeedback('Группы не найдены автоматически. ' + NO_DISCOVERY_HINT, false);
+        return;
+      }
       await fetchSheetData(baseUrl, firstGroup);
       showAdminFeedback(`Успешно! Таблица доступна, лист «${firstGroup}» прочитан корректно.`, true);
     } catch (err) {
-      showAdminFeedback(`Не удалось прочитать лист «${firstGroup}». Проверьте название вкладки и открыт ли доступ по ссылке.`, false);
+      showAdminFeedback('Не удалось прочитать таблицу. Проверьте ссылку и открыт ли доступ по ссылке.', false);
+    } finally {
+      setLoading(btn, false);
+    }
+  });
+
+  // Подтянуть список групп в форму
+  $('load-groups-btn').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const baseUrl = normalizeSheetBaseUrl($('admin-sheet-url').value);
+    if (!baseUrl) {
+      showAdminFeedback('Сначала укажите корректную ссылку на Google Таблицу.', false);
+      return;
+    }
+    setLoading(btn, true);
+    showAdminFeedback('Читаем вкладки таблицы...', true);
+    try {
+      const found = await discoverGroups(baseUrl);
+      if (found) {
+        $('admin-groups-list').value = found.groups.join(', ');
+        showAdminFeedback(`Найдено групп: ${found.groups.length}. Они будут подгружаться автоматически.`, true);
+      } else {
+        showAdminFeedback('Группы не найдены автоматически. ' + NO_DISCOVERY_HINT, false);
+      }
+    } finally {
+      setLoading(btn, false);
+    }
+  });
+
+  // Обновить группы всех курсов
+  $('refresh-groups-btn').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    setLoading(btn, true);
+    try {
+      await syncAll();
+      renderAdminCoursesList();
+      toast('Группы обновлены из таблиц', 'ok', '🔄');
     } finally {
       setLoading(btn, false);
     }
   });
 
   // Сохранение курса или обновление существующего
-  document.getElementById('admin-form').addEventListener('submit', (e) => {
+  document.getElementById('admin-form').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const name = document.getElementById('admin-course-name').value.trim();
-    const rawUrl = document.getElementById('admin-sheet-url').value.trim();
-    const rawGroups = document.getElementById('admin-groups-list').value;
-
-    const baseUrl = normalizeSheetBaseUrl(rawUrl);
-    const groups = rawGroups.split(',').map(g => g.trim()).filter(Boolean);
+    const form = e.currentTarget;
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const name = $('admin-course-name').value.trim();
+    const baseUrl = normalizeSheetBaseUrl($('admin-sheet-url').value.trim());
+    let groups = $('admin-groups-list').value.split(',').map(g => g.trim()).filter(Boolean);
 
     if (!baseUrl) {
       showAdminFeedback('Некорректная ссылка на Google Таблицу.', false);
       return;
     }
-    if (!groups.length) {
-      showAdminFeedback('Добавьте хотя бы одну группу через запятую.', false);
-      return;
-    }
 
-    const existingIndex = coursesConfig.findIndex(c => c.name.toLowerCase() === name.toLowerCase());
-    if (existingIndex >= 0) {
-      coursesConfig[existingIndex].sheetUrl = baseUrl;
-      coursesConfig[existingIndex].groups = groups;
-      currentCourse = coursesConfig[existingIndex];
-    } else {
-      const newCourse = {
-        id: 'course-' + Date.now(),
-        name,
-        sheetUrl: baseUrl,
-        groups
-      };
-      coursesConfig.push(newCourse);
-      currentCourse = newCourse;
-    }
+    setLoading(submitBtn, true);
+    try {
+      // Группы из таблицы имеют приоритет; ручной список — запасной вариант
+      const found = await discoverGroups(baseUrl);
+      if (found) {
+        groups = found.groups;
+        groupsCache[baseUrl] = found.groups;
+        saveGroupsCache();
+      }
+      if (!groups.length) {
+        showAdminFeedback('Не удалось получить список групп автоматически. ' + NO_DISCOVERY_HINT + ' Либо впишите группы вручную.', false);
+        return;
+      }
 
-    flashId = currentCourse.id;
-    saveConfig();
-    localStorage.setItem(STORAGE_KEY_SELECTED_COURSE, currentCourse.id);
-    populateCourseAndGroupSelects();
-    renderAdminCoursesList();
-    loadCurrentSchedule();
-    showAdminFeedback(`Курс «${name}» (${groups.length} гр.) успешно сохранён!`, true);
-    e.target.reset();
+      const backup = JSON.stringify(coursesConfig);
+      const existingIndex = coursesConfig.findIndex(c => c.name.toLowerCase() === name.toLowerCase());
+      let target;
+      if (existingIndex >= 0) {
+        coursesConfig[existingIndex].sheetUrl = baseUrl;
+        coursesConfig[existingIndex].groups = groups;
+        target = coursesConfig[existingIndex];
+      } else {
+        target = { id: 'course-' + Date.now(), name, sheetUrl: baseUrl, groups };
+        coursesConfig.push(target);
+      }
+      try {
+        await persistCourses();
+      } catch (err) {
+        coursesConfig = JSON.parse(backup);
+        showAdminFeedback('Не удалось сохранить на сервере' + (err.message === 'auth' ? ': нужно войти заново.' : '. Проверьте BACKEND_URL и интернет.'), false);
+        return;
+      }
+      currentCourse = coursesConfig.find(c => c.id === target.id);
+
+      flashId = currentCourse.id;
+      localStorage.setItem(STORAGE_KEY_SELECTED_COURSE, currentCourse.id);
+      populateCourseAndGroupSelects();
+      renderAdminCoursesList();
+      loadCurrentSchedule();
+      showAdminFeedback(`Курс «${name}» (${groups.length} гр.) сохранён${found ? ', группы загружены из таблицы' : ''}!`, true);
+      form.reset();
+    } finally {
+      setLoading(submitBtn, false);
+    }
   });
 
   // Сброс к стандартным настройкам
   document.getElementById('reset-defaults-btn').addEventListener('click', () => {
     localStorage.removeItem(STORAGE_KEY_COURSES);
+    localStorage.removeItem(STORAGE_KEY_GROUPS);
+    groupsCache = {};
     loadConfig();
+    if (BACKEND_URL) {
+      coursesConfig = JSON.parse(JSON.stringify(DEFAULT_COURSES));
+      persistCourses().catch(() => toast('Не удалось сбросить настройки на сервере', 'err', '⚠️'));
+    }
     populateCourseAndGroupSelects();
     renderAdminCoursesList();
     loadCurrentSchedule();
@@ -1088,7 +1386,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Копирование JSON конфига для вставки в код сайта
   $('copy-config-btn').addEventListener('click', async (e) => {
     const btn = e.currentTarget, lbl = btn.querySelector('.lbl');
-    const text = `const DEFAULT_COURSES = ${JSON.stringify(coursesConfig, null, 2)};`;
+    const text = `const DEFAULT_COURSES = ${JSON.stringify(coursesConfig.map(c => ({ ...c, groups: getGroups(c) })), null, 2)};`;
     let ok = false;
     try { await navigator.clipboard.writeText(text); ok = true; } catch (err) {
       const ta = document.createElement('textarea');
