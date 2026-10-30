@@ -1,0 +1,1112 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Расписание занятий — Интерактивный портал</title>
+  <!-- Tailwind CSS для базовой сетки -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Шрифт Montserrat Bold -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700&display=swap" rel="stylesheet">
+  <style>
+:root{--ink:#38335E;--soft:#6B6691;--line:rgba(140,128,200,.22);--lilac:#C6BBF8;--lilac-2:#A99BEE;--lilac-bg:#EAE5FB;--peri:#CFDEFF;--peri-2:#B3CAFA;--peri-ink:#25346A;--mint:#CFF0E2;--mint-ink:#1D5A44;--rose:#FBCDD7;--rose-ink:#7A2340;--butter:#FFF0BF;--butter-ink:#664A00;--spring:cubic-bezier(.34,1.56,.64,1);--out:cubic-bezier(.16,1,.3,1)}
+html *,html *::before,html *::after{border-color:var(--line)}
+body{font-family:'Montserrat',system-ui,sans-serif;font-weight:700;color:var(--ink);background:linear-gradient(160deg,#F8F4FD 0%,#EDF3FF 55%,#FFF2EA 100%) fixed}
+body.no-scroll{overflow:hidden}
+.muted{color:var(--soft)}
+code{background:var(--lilac-bg);padding:0 .3rem;border-radius:.3rem}
+
+/* Фоновые пастельные сферы */
+.bg-orb{position:fixed;border-radius:50%;filter:blur(90px);pointer-events:none;z-index:0;opacity:.65;animation:floatOrb 18s ease-in-out infinite alternate}
+.orb-1{width:420px;height:420px;background:radial-gradient(circle,#FFD6C7,transparent 70%);top:-120px;left:-100px}
+.orb-2{width:500px;height:500px;background:radial-gradient(circle,#C9D8FF,transparent 70%);bottom:-160px;right:-120px;animation-delay:-9s}
+.orb-3{width:360px;height:360px;background:radial-gradient(circle,#CDEFE2,transparent 70%);top:42%;left:55%;animation-delay:-4s}
+
+/* Стекло */
+.glass-header{background:rgba(250,247,255,.8);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid var(--line);animation:dropIn .6s var(--out) backwards}
+.glass-panel{background:rgba(255,255,255,.62);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.9);box-shadow:0 22px 44px -26px rgba(110,96,190,.45)}
+body>section{animation:riseIn .6s var(--out) .12s backwards}
+
+/* Бейджи недель */
+#course-badge{background:var(--lilac-bg);color:#3F357F;border:1px solid #D9D0F5;animation:pop .5s var(--spring) .15s backwards}
+.week-chip{display:flex;align-items:center;gap:.5rem;padding:.5rem .875rem;border-radius:.75rem;font-size:12px;box-shadow:0 8px 16px -10px rgba(110,96,190,.5);animation:pop .55s var(--spring) .25s backwards;transition:transform .3s var(--spring),box-shadow .3s}
+.week-chip:hover{transform:translateY(-2px) scale(1.04)}
+.week-num{background:#fff;border:1px solid #E6E0F5}
+.week-den{background:var(--peri);color:var(--peri-ink);border:1px solid var(--peri-2)}
+.week-current{animation:pop .55s var(--spring) .25s backwards,glow 2.8s ease-in-out 1s infinite}
+
+/* Формы */
+select,input,textarea{background:rgba(255,255,255,.88);color:var(--ink);border:1.5px solid #DAD3F1;transition:border-color .25s,box-shadow .25s,transform .25s var(--out)}
+select.custom-select{appearance:none;-webkit-appearance:none;cursor:pointer;padding-right:2.4rem;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%236B6691' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right .9rem center}
+select:hover,input:hover,textarea:hover{border-color:var(--lilac-2);transform:translateY(-1px)}
+select:focus,input:focus,textarea:focus{outline:none;border-color:var(--lilac-2);box-shadow:0 0 0 4px rgba(169,155,238,.28)}
+input::placeholder,textarea::placeholder{color:#8A86AE}
+.flash-ring{animation:ring .7s ease-out}
+.form-flash input,.form-flash textarea{animation:ring .9s ease-out}
+.field-wrap{position:relative}
+.eye{position:absolute;right:.4rem;top:50%;transform:translateY(-50%);width:2.2rem;height:2.2rem;border-radius:.7rem;box-shadow:none}
+.eye:hover{transform:translateY(-50%) scale(1.1)}
+.eye:active{transform:translateY(-50%) scale(.9)}
+.form-error{display:none;background:var(--rose);color:var(--rose-ink);border:1px solid #F1A9BB;border-radius:.75rem;padding:.6rem .8rem;font-size:12px}
+.form-error.show{display:block;animation:pop .4s var(--spring)}
+.feedback{animation:pop .4s var(--spring)}
+.feedback.ok{background:var(--mint);color:var(--mint-ink);border:1px solid #A9DEC8}
+.feedback.err{background:var(--rose);color:var(--rose-ink);border:1px solid #F1A9BB}
+
+/* Кнопки */
+.btn{position:relative;overflow:hidden;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:.5rem;border:1.5px solid transparent;background:var(--lilac-bg);color:var(--ink);box-shadow:0 6px 14px -8px rgba(110,96,190,.55);transition:transform .25s var(--spring),box-shadow .25s,background-color .25s,border-color .25s,color .25s;-webkit-tap-highlight-color:transparent}
+.btn::before{content:'';position:absolute;top:0;bottom:0;left:-60%;width:40%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.7),transparent);transform:skewX(-20deg);transition:left .65s var(--out);pointer-events:none}
+.btn:hover{transform:translateY(-2px);box-shadow:0 14px 22px -10px rgba(110,96,190,.6)}
+.btn:hover::before{left:130%}
+.btn:active{transform:translateY(0) scale(.95);transition-duration:.08s}
+.btn:focus-visible{outline:3px solid rgba(154,139,234,.6);outline-offset:2px}
+.btn:disabled{cursor:default;opacity:.7}
+.ico{display:inline-block;transition:transform .35s var(--spring)}
+.btn:hover .ico{transform:rotate(-14deg) scale(1.2)}
+#open-admin-btn:hover .ico{transform:rotate(120deg) scale(1.1)}
+.delete-course-btn:hover .ico{animation:wiggle .5s ease-in-out}
+#close-admin-btn:hover{transform:rotate(90deg) scale(1.08)}
+.ico.pop{animation:pop .4s var(--spring)}
+.ripple{position:absolute;border-radius:50%;background:rgba(255,255,255,.8);transform:scale(0);animation:ripple .6s ease-out forwards;pointer-events:none}
+.btn.is-loading{color:transparent;pointer-events:none}
+.btn.is-loading .ico{opacity:0}
+.btn.is-loading::after{content:'';position:absolute;inset:0;margin:auto;width:16px;height:16px;border-radius:50%;border:2.5px solid rgba(56,51,94,.25);border-top-color:var(--ink);animation:spin .7s linear infinite}
+.v-soft{background:rgba(255,255,255,.9);border-color:#DAD3F1}
+.v-main{background:linear-gradient(135deg,#C6BBF8,#B0C7FB);color:#2C2656}
+.v-white{background:#fff;border-color:#E6E0F5}
+.v-blue{background:var(--peri);color:var(--peri-ink);border-color:var(--peri-2)}
+.v-mint{background:var(--mint);color:var(--mint-ink);border-color:#A9DEC8}
+.v-rose{background:var(--rose);color:var(--rose-ink);border-color:#F1A9BB}
+.v-ok{background:var(--mint)!important;color:var(--mint-ink)!important}
+.v-link{background:transparent;box-shadow:none;color:var(--rose-ink);padding:.25rem .6rem;border-radius:.5rem}
+.v-link:hover{background:var(--rose);box-shadow:none}
+.filter-btn.active-filter{box-shadow:0 0 0 3px rgba(169,155,238,.75),0 12px 20px -10px rgba(110,96,190,.6);animation:pop .45s var(--spring)}
+.legend-dot{display:inline-block;border-radius:.3rem;width:14px;height:14px;box-shadow:0 2px 4px -1px rgba(110,96,190,.35)}
+.filter-btn .legend-dot{width:10px;height:10px;border-radius:50%}
+.dot-num{background:#fff;border:1px solid #D9D0F5}
+.dot-den{background:#9DB9F5}
+
+/* Статус */
+.loader-dot{width:8px;height:8px;border-radius:50%;background:var(--lilac-2);display:inline-block;animation:pulseDot 1.2s infinite ease-in-out}
+.sdot{width:8px;height:8px;border-radius:50%;display:inline-block}
+.sdot.ok{background:#5CC49E;animation:ping 1.8s infinite}
+.sdot.err{background:#E57C98}
+.status-swap{animation:fadeIn .4s ease-out}
+
+/* Карточки расписания */
+.day-card-animate{animation:riseIn .55s var(--out) var(--d,0ms) backwards}
+.day-marker{width:10px;height:24px;border-radius:99px;display:inline-block;background:linear-gradient(#C6BBF8,#A9C4FB);transition:transform .4s var(--spring)}
+.glass-panel:hover .day-marker{transform:scaleY(1.25)}
+.pill{background:var(--lilac-bg);border:1px solid #D9D0F5}
+.slot-row{background:rgba(255,255,255,.6);border:1px solid var(--line);transition:background .25s,transform .3s var(--out),box-shadow .3s}
+.slot-row:hover{background:rgba(255,255,255,.92);transform:translateX(4px);box-shadow:0 12px 24px -18px rgba(110,96,190,.6)}
+.half-card{border-left:6px solid;animation:riseIn .5s var(--out) var(--d,0ms) backwards;transition:transform .3s var(--out),box-shadow .3s}
+.half-card:hover{transform:translateY(-4px) scale(1.01)}
+.card-numerator{background:#FFFEFC;color:var(--ink);border-color:#F6CDBC;box-shadow:0 10px 22px -14px rgba(200,140,110,.6)}
+.card-denominator{background:linear-gradient(135deg,#D8E5FF,#BDD0FB);color:var(--peri-ink);border-color:#8FB0F2;box-shadow:0 10px 22px -14px rgba(70,100,200,.6)}
+.badge{background:#F3EEFB;border:1px solid #E1D8F3}
+.chip{background:var(--lilac-bg);color:#2C2656}
+.card-denominator .badge{background:rgba(255,255,255,.6);border-color:rgba(37,52,106,.15)}
+.card-denominator .chip{background:#fff;color:var(--peri-ink)}
+.card-meta{border-top:1px solid}
+.card-numerator .card-meta{color:var(--soft)}
+.card-denominator .card-meta{color:rgba(37,52,106,.82);border-color:rgba(37,52,106,.18)}
+.note-change{background:var(--butter);border:1px solid #F1D98B;color:var(--butter-ink)}
+.note-change .ico{animation:wiggle 2.6s ease-in-out infinite}
+.skel{height:190px;border-radius:1.5rem;background:linear-gradient(90deg,rgba(255,255,255,.5) 25%,rgba(255,255,255,.95) 50%,rgba(255,255,255,.5) 75%);background-size:200% 100%;animation:shimmer 1.3s linear infinite}
+
+/* Модальные окна */
+.modal-backdrop{display:none;position:fixed;inset:0;z-index:50;align-items:center;justify-content:center;padding:1rem;background:rgba(88,76,140,.28);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.modal-backdrop.open{display:flex;animation:fadeIn .25s ease-out both}
+.modal-content{background:rgba(255,255,255,.94)}
+.modal-backdrop.open .modal-content{animation:modalPop .4s var(--spring) both}
+.modal-backdrop.closing{animation:fadeOut .22s ease-in both}
+.modal-backdrop.closing .modal-content{animation:modalOut .22s ease-in both}
+.modal-backdrop .modal-content.shake{animation:shake .45s}
+.lock-badge{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:28px;background:linear-gradient(135deg,#E3DCFC,#CFE0FF);box-shadow:0 12px 24px -12px rgba(110,96,190,.7);animation:bob 3s ease-in-out infinite}
+.course-item{background:rgba(255,255,255,.78);border:1px solid var(--line);animation:itemIn .45s var(--out) var(--d,0ms) backwards;transition:transform .3s var(--out),box-shadow .3s}
+.course-item:hover{transform:translateX(4px);box-shadow:0 12px 24px -18px rgba(110,96,190,.6)}
+.course-item.flash{animation:itemIn .45s var(--out) backwards,flashBg 1.4s ease-out .2s}
+.course-item.removing{animation:itemOut .3s ease-in forwards}
+.export-box{background:rgba(234,229,251,.55);border:1px solid var(--line)}
+
+/* Уведомления */
+.toast-root{position:fixed;right:1rem;bottom:1rem;z-index:80;display:flex;flex-direction:column;gap:.6rem;align-items:flex-end;pointer-events:none}
+.toast{position:relative;overflow:hidden;display:flex;gap:.6rem;align-items:center;padding:.75rem 1rem;border-radius:1rem;font-size:13px;max-width:min(92vw,360px);box-shadow:0 16px 30px -14px rgba(80,66,150,.55);animation:toastIn .45s var(--spring) both}
+.toast.out{animation:toastOut .3s ease-in both}
+.toast-ok{background:var(--mint);color:var(--mint-ink)}
+.toast-err{background:var(--rose);color:var(--rose-ink)}
+.toast-info{background:var(--lilac-bg);color:#2C2656}
+.toast::after{content:'';position:absolute;left:0;bottom:0;height:3px;width:100%;background:currentColor;opacity:.35;transform-origin:left;animation:bar 3.2s linear forwards}
+
+/* Анимации */
+@keyframes floatOrb{to{transform:translate(40px,30px) scale(1.12)}}
+@keyframes dropIn{from{opacity:0;transform:translateY(-100%)}}
+@keyframes riseIn{from{opacity:0;transform:translateY(22px) scale(.985)}}
+@keyframes pop{0%{transform:scale(.8);opacity:0}60%{transform:scale(1.07);opacity:1}100%{transform:scale(1)}}
+@keyframes ripple{to{transform:scale(1);opacity:0}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-10px)}40%{transform:translateX(9px)}60%{transform:translateX(-6px)}80%{transform:translateX(4px)}}
+@keyframes ring{0%{box-shadow:0 0 0 0 rgba(169,155,238,.6)}100%{box-shadow:0 0 0 10px rgba(169,155,238,0)}}
+@keyframes glow{0%,100%{box-shadow:0 8px 16px -10px rgba(110,96,190,.5)}50%{box-shadow:0 0 0 5px rgba(169,155,238,.28),0 8px 16px -10px rgba(110,96,190,.5)}}
+@keyframes ping{0%{box-shadow:0 0 0 0 rgba(92,196,158,.55)}70%,100%{box-shadow:0 0 0 8px rgba(92,196,158,0)}}
+@keyframes pulseDot{0%,100%{transform:scale(.8);opacity:.5}50%{transform:scale(1.3);opacity:1}}
+@keyframes shimmer{to{background-position:-200% 0}}
+@keyframes wiggle{0%,100%{transform:rotate(0)}20%{transform:rotate(-16deg)}40%{transform:rotate(14deg)}60%{transform:rotate(-8deg)}80%{transform:rotate(5deg)}}
+@keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@keyframes fadeIn{from{opacity:0}}
+@keyframes fadeOut{to{opacity:0}}
+@keyframes modalPop{from{opacity:0;transform:translateY(24px) scale(.92)}}
+@keyframes modalOut{to{opacity:0;transform:translateY(16px) scale(.96)}}
+@keyframes itemIn{from{opacity:0;transform:translateX(-16px)}}
+@keyframes itemOut{to{opacity:0;transform:translateX(40px) scale(.95)}}
+@keyframes flashBg{0%{background:#D9F3E8}100%{background:rgba(255,255,255,.78)}}
+@keyframes toastIn{from{opacity:0;transform:translateX(60px) scale(.9)}}
+@keyframes toastOut{to{opacity:0;transform:translateX(60px) scale(.9)}}
+@keyframes bar{to{transform:scaleX(0)}}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body class="min-h-screen pb-20 relative overflow-x-hidden">
+
+  <!-- Анимированные фоновые сферы -->
+  <div class="bg-orb orb-1"></div>
+  <div class="bg-orb orb-2"></div>
+  <div class="bg-orb orb-3"></div>
+
+  <!-- Шапка -->
+  <header class="sticky top-0 z-30 glass-header">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span id="course-badge" class="px-3 py-0.5 text-xs rounded-full border">
+            3 КУРС • ОФО
+          </span>
+          <span id="current-date-badge" class="text-xs muted"></span>
+        </div>
+        <h1 class="text-2xl sm:text-3xl mt-1">
+          Расписание учебных занятий
+        </h1>
+      </div>
+
+      <!-- Индикатор недель и кнопка Админ-панели -->
+      <div class="flex flex-wrap items-center gap-2.5">
+        <div id="this-week-banner" class="px-3.5 py-2 rounded-xl text-xs flex items-center gap-2">
+          <span>Эта неделя:</span>
+          <strong id="this-week-label" class="text-sm">...</strong>
+        </div>
+        <div id="next-week-banner" class="px-3.5 py-2 rounded-xl text-xs flex items-center gap-2">
+          <span>Следующая:</span>
+          <strong id="next-week-label" class="text-sm">...</strong>
+        </div>
+
+        <button id="open-admin-btn" class="ml-auto md:ml-2 px-3.5 py-2 rounded-xl text-xs muted border flex items-center gap-2 btn v-soft">
+          <span class="ico">⚙️</span>
+          <span>Админ-панель</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Панель управления (Курс, Группа, Фильтр) -->
+  <section class="max-w-6xl mx-auto px-4 mt-6 relative z-10">
+    <div class="glass-panel rounded-2xl p-4 md:p-5 flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between">
+      
+      <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
+        <!-- Выбор курса -->
+        <div class="flex flex-col flex-1 sm:max-w-[220px]">
+          <label for="course-select" class="text-[11px] muted mb-1">
+            Курс / Таблица
+          </label>
+          <select id="course-select" class="custom-select w-full border text-sm rounded-xl px-3.5 py-2.5 focus:outline-none">
+          </select>
+        </div>
+
+        <!-- Выбор группы -->
+        <div class="flex flex-col flex-1 sm:max-w-[240px]">
+          <label for="group-select" class="text-[11px] muted mb-1">
+            Учебная группа
+          </label>
+          <select id="group-select" class="custom-select w-full border text-sm rounded-xl px-3.5 py-2.5 focus:outline-none">
+          </select>
+        </div>
+      </div>
+
+      <!-- Фильтр Числитель / Знаменатель -->
+      <div class="flex flex-col">
+        <span class="text-[11px] muted mb-1 hidden lg:block">
+          Режим отображения
+        </span>
+        <div class="flex flex-wrap items-center gap-2">
+          <button data-filter="all" class="filter-btn active-filter px-4 py-2.5 rounded-xl text-xs border btn v-main">
+            Обе недели
+          </button>
+          <button data-filter="numerator" class="filter-btn px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 btn v-white">
+            <span class="legend-dot dot-num"></span>
+            Числитель (белый)
+          </button>
+          <button data-filter="denominator" class="filter-btn px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 btn v-blue">
+            <span class="legend-dot dot-den"></span>
+            Знаменатель (синий)
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Статус и Легенда -->
+    <div class="flex flex-wrap items-center justify-between gap-4 mt-4 px-2 text-xs muted">
+      <div class="flex items-center gap-5">
+        <span class="flex items-center gap-2">
+          <span class="legend-dot dot-num"></span>
+          Числитель — белый цвет
+        </span>
+        <span class="flex items-center gap-2">
+          <span class="legend-dot dot-den"></span>
+          Знаменатель — синий цвет
+        </span>
+      </div>
+      <div id="status-message" class="muted flex items-center gap-2">
+        <span class="loader-dot"></span>
+        <span>Загрузка данных...</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Контейнер расписания -->
+  <main id="schedule-container" class="max-w-6xl mx-auto px-4 mt-6 grid grid-cols-1 gap-6 relative z-10">
+    <!-- Карточки дней рендерятся скриптом ниже -->
+  </main>
+
+  <!-- МОДАЛЬНОЕ ОКНО АДМИН-ПАНЕЛИ -->
+  <div id="admin-modal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-content glass-panel w-full max-w-2xl rounded-3xl p-6 sm:p-8 border max-h-[90vh] overflow-y-auto">
+      
+      <div class="flex items-center justify-between pb-4 border-b">
+        <div>
+          <h2 class="text-xl flex items-center gap-2">
+            <span class="ico">⚙️</span> Управление расписаниями и курсами
+          </h2>
+          <p class="text-xs muted mt-1">
+            Добавляйте ссылки на Google Таблицы для других курсов и списки групп (листов таблицы).
+          </p>
+        </div>
+        <div class="flex items-center gap-2 shrink-0"><button id="logout-btn" type="button" class="btn v-soft px-3 h-9 rounded-xl text-xs"><span class="ico">🚪</span><span>Выйти</span></button><button id="close-admin-btn" class="w-9 h-9 rounded-xl muted flex items-center justify-center text-lg btn v-soft">
+          ✕
+        </button></div>
+      </div>
+
+      <!-- Форма добавления / обновления курса -->
+      <form id="admin-form" class="mt-5 space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs muted mb-1.5">
+              Название курса / потока *
+            </label>
+            <input id="admin-course-name" type="text" required placeholder="Например: 2 курс (ОФО)" class="w-full border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none" />
+          </div>
+
+          <div>
+            <label class="block text-xs muted mb-1.5">
+              Ссылка на Google Таблицу *
+            </label>
+            <input id="admin-sheet-url" type="url" required placeholder="https://docs.google.com/spreadsheets/d/..." class="w-full border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs muted mb-1.5">
+            Группы (названия листов в таблице через запятую) *
+          </label>
+          <textarea id="admin-groups-list" rows="2" required placeholder="241Р01 ИНФ, 241Р71 Эконом, 241Р91 Архитектура" class="w-full border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none"></textarea>
+          <p class="text-[11px] muted mt-1">
+            Важно: название каждой группы должно в точности совпадать с именем вкладки (листа) внизу Google Таблицы.
+          </p>
+        </div>
+
+        <div class="flex flex-wrap items-center justify-between gap-3 pt-2">
+          <button type="button" id="test-sheet-btn" class="px-4 py-2.5 rounded-xl text-xs muted border btn v-soft">
+            <span class="ico">🔍</span> Проверить связь с таблицей
+          </button>
+          <button type="submit" class="px-5 py-2.5 rounded-xl text-xs btn v-main">
+            <span class="ico">➕</span> Сохранить курс и группы
+          </button>
+        </div>
+        <div id="admin-feedback" class="text-xs hidden rounded-xl p-3"></div>
+      </form>
+
+      <!-- Список существующих курсов -->
+      <div class="mt-7 pt-5 border-t">
+        <div class="flex items-center justify-between mb-3">
+          <h3 class="text-sm">Подключённые курсы и таблицы</h3>
+          <button id="reset-defaults-btn" class="text-[11px] btn v-link">
+            Сбросить к стандартным
+          </button>
+        </div>
+        <div id="admin-courses-list" class="space-y-2.5">
+          <!-- Рендерится динамически -->
+        </div>
+      </div>
+
+      <!-- Экспорт для GitHub Pages -->
+      <div class="mt-6 pt-4 border-t flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 export-box p-4 rounded-2xl">
+        <div class="text-xs muted">
+          <strong class="muted block mb-0.5">Хотите, чтобы новые курсы видели все пользователи GitHub Pages?</strong>
+          Скопируйте готовый JSON-код настроек и вставьте его в начало тега <code>&lt;script&gt;</code> файла <code>index.html</code>.
+        </div>
+        <button id="copy-config-btn" class="shrink-0 px-3.5 py-2 rounded-xl text-xs border btn v-mint">
+          <span class="ico">📋</span><span class="lbl">Скопировать конфиг</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО ВХОДА -->
+  <div id="login-modal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-content glass-panel w-full max-w-sm rounded-3xl p-6 sm:p-8" role="dialog" aria-modal="true" aria-labelledby="login-title">
+      <div class="flex flex-col items-center text-center">
+        <div id="login-lock" class="lock-badge">🔒</div>
+        <h2 id="login-title" class="text-xl mt-4">Вход в админ-панель</h2>
+        <p class="muted text-xs mt-1">Введите логин и пароль администратора</p>
+      </div>
+      <form id="login-form" class="mt-6 space-y-4" novalidate>
+        <div>
+          <label for="login-user" class="block text-xs muted mb-1.5">Логин</label>
+          <input id="login-user" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" class="w-full rounded-xl px-3.5 py-2.5 text-sm" />
+        </div>
+        <div>
+          <label for="login-pass" class="block text-xs muted mb-1.5">Пароль</label>
+          <div class="field-wrap">
+            <input id="login-pass" type="password" autocomplete="current-password" class="w-full rounded-xl px-3.5 py-2.5 pr-12 text-sm" />
+            <button type="button" id="toggle-pass" class="btn v-soft eye" aria-label="Показать пароль"><span class="ico">👁️</span></button>
+          </div>
+        </div>
+        <div id="login-error" class="form-error" role="alert"></div>
+        <div class="flex gap-3 pt-1">
+          <button type="button" id="login-cancel" class="btn v-soft flex-1 rounded-xl py-2.5 text-xs">Отмена</button>
+          <button type="submit" id="login-submit" class="btn v-main flex-1 rounded-xl py-2.5 text-xs"><span class="ico">🔑</span><span class="lbl">Войти</span></button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast-root" class="toast-root" aria-live="polite"></div>
+
+  <!-- Вся логика -->
+  <script>
+/* ===== Утилиты ===== */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const plural = (n, [one, few, many]) => { const m = n % 100, d = n % 10; return m > 10 && m < 20 ? many : d === 1 ? one : d > 1 && d < 5 ? few : many; };
+const restart = (el, cls) => { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); };
+const flash = el => { restart(el, 'flash-ring'); };
+
+function toast(message, type = 'ok', icon = '✅') {
+  const root = $('toast-root');
+  while (root.children.length >= 3) root.firstChild.remove();
+  const el = document.createElement('div');
+  el.className = 'toast toast-' + type;
+  el.innerHTML = '<span>' + icon + '</span><span></span>';
+  el.lastChild.textContent = message;
+  root.appendChild(el);
+  setTimeout(() => { el.classList.add('out'); setTimeout(() => el.remove(), 300); }, 3200);
+}
+
+// Ripple-эффект на всех кнопках
+document.addEventListener('pointerdown', e => {
+  const b = e.target.closest('.btn');
+  if (!b || b.disabled) return;
+  const r = b.getBoundingClientRect(), size = Math.max(r.width, r.height) * 2;
+  const s = document.createElement('span');
+  s.className = 'ripple';
+  s.style.cssText = `width:${size}px;height:${size}px;left:${e.clientX - r.left - size / 2}px;top:${e.clientY - r.top - size / 2}px`;
+  b.appendChild(s);
+  s.addEventListener('animationend', () => s.remove());
+});
+
+const setLoading = (btn, on) => { btn.classList.toggle('is-loading', on); btn.disabled = on; };
+
+let lastFocus = null;
+function openModal(el, focusEl) {
+  lastFocus = document.activeElement;
+  el.classList.remove('closing');
+  el.classList.add('open');
+  el.setAttribute('aria-hidden', 'false');
+  document.body.classList.add('no-scroll');
+  if (focusEl) setTimeout(() => focusEl.focus(), 60);
+}
+function closeModal(el) {
+  if (!el.classList.contains('open') || el.classList.contains('closing')) return;
+  el.classList.add('closing');
+  setTimeout(() => {
+    el.classList.remove('open', 'closing');
+    el.setAttribute('aria-hidden', 'true');
+    if (!document.querySelector('.modal-backdrop.open')) document.body.classList.remove('no-scroll');
+    if (lastFocus && lastFocus.focus) lastFocus.focus();
+  }, 220);
+}
+
+/* ===== Вход в админ-панель =====
+   ВАЖНО: это защита на стороне браузера — она скрывает панель от случайных посетителей,
+   но не заменяет серверную авторизацию. Пароль в коде не хранится, только его SHA-256 хэш. */
+const AUTH_SALT = 'schedule-portal::';
+const AUTH_HASH = 'c9d9b4ec9847d39c29c19daeb37c4bcefe694bb17c62ead62090b892e4ebfd0b';
+const STORAGE_KEY_AUTH = 'schedule_portal_admin_auth';
+
+function sha256(msg) {
+  const bytes = Array.from(new TextEncoder().encode(msg));
+  const rr = (v, a) => (v >>> a) | (v << (32 - a));
+  const K = [], H = [], comp = {};
+  for (let c = 2, n = 0; n < 64; c++) {
+    if (comp[c]) continue;
+    for (let i = 0; i < 313; i += c) comp[i] = c;
+    if (n < 8) H[n] = (Math.pow(c, 0.5) * 4294967296) | 0;
+    K[n++] = (Math.pow(c, 1 / 3) * 4294967296) | 0;
+  }
+  const bitLen = bytes.length * 8;
+  bytes.push(0x80);
+  while (bytes.length % 64 !== 56) bytes.push(0);
+  const hi = Math.floor(bitLen / 4294967296), lo = bitLen >>> 0;
+  for (let i = 3; i >= 0; i--) bytes.push((hi >>> (i * 8)) & 255);
+  for (let i = 3; i >= 0; i--) bytes.push((lo >>> (i * 8)) & 255);
+  for (let o = 0; o < bytes.length; o += 64) {
+    const w = [];
+    for (let i = 0; i < 64; i++) {
+      if (i < 16) w[i] = (bytes[o + i * 4] << 24) | (bytes[o + i * 4 + 1] << 16) | (bytes[o + i * 4 + 2] << 8) | bytes[o + i * 4 + 3];
+      else {
+        const s0 = rr(w[i - 15], 7) ^ rr(w[i - 15], 18) ^ (w[i - 15] >>> 3);
+        const s1 = rr(w[i - 2], 17) ^ rr(w[i - 2], 19) ^ (w[i - 2] >>> 10);
+        w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
+      }
+    }
+    let [a, b, c, d, e, f, g, h] = H;
+    for (let i = 0; i < 64; i++) {
+      const t1 = (h + (rr(e, 6) ^ rr(e, 11) ^ rr(e, 25)) + ((e & f) ^ (~e & g)) + K[i] + w[i]) | 0;
+      const t2 = ((rr(a, 2) ^ rr(a, 13) ^ rr(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) | 0;
+      h = g; g = f; f = e; e = (d + t1) | 0; d = c; c = b; b = a; a = (t1 + t2) | 0;
+    }
+    [a, b, c, d, e, f, g, h].forEach((v, i) => { H[i] = (H[i] + v) | 0; });
+  }
+  return H.map(x => (x >>> 0).toString(16).padStart(8, '0')).join('');
+}
+const credentialsValid = (login, pass) => sha256(AUTH_SALT + login.trim().toLowerCase() + '::' + pass) === AUTH_HASH;
+
+let isAdmin = false;
+try { isAdmin = sessionStorage.getItem(STORAGE_KEY_AUTH) === '1'; } catch (e) {}
+function setAdmin(on) {
+  isAdmin = on;
+  try { on ? sessionStorage.setItem(STORAGE_KEY_AUTH, '1') : sessionStorage.removeItem(STORAGE_KEY_AUTH); } catch (e) {}
+}
+
+/**
+ * БАЗОВАЯ КОНФИГУРАЦИЯ КУРСОВ И ТАБЛИЦ
+ * Вы можете добавлять новые курсы прямо через Админ-панель на сайте!
+ */
+const DEFAULT_COURSES = [
+  {
+    id: 'course-3-ofo',
+    name: '3 курс (ОФО)',
+    sheetUrl: 'https://docs.google.com/spreadsheets/d/' + '1AkCRgvmlPlkq6XYNdNSkPzhcZm3eI-Xu2c2kabK0Avg',
+    groups: [
+      '241Р01 ИНФ',
+      '241Р71 Эконом',
+      '241Р91 Архитектура',
+      '241Р111 Дизайн',
+      '241Р11 ПГС',
+      '241Р31 ЭН',
+      '241Р21 УЗС',
+      '241Р41 ТМС',
+      '241Р61 НТТС'
+    ]
+  }
+];
+
+const STORAGE_KEY_COURSES = 'schedule_portal_courses_v2';
+const STORAGE_KEY_SELECTED_COURSE = 'schedule_portal_selected_course';
+const STORAGE_KEY_SELECTED_GROUP = 'schedule_portal_selected_group';
+
+let coursesConfig = [];
+let currentCourse = null;
+let currentGroup = '';
+let currentFilter = 'all';
+let cachedScheduleData = [];
+
+// 1. Загрузка и сохранение конфигурации курсов
+function loadConfig() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_COURSES);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        coursesConfig = parsed;
+        return;
+      }
+    }
+  } catch (e) {
+    console.warn('Ошибка чтения localStorage, используем стандартный конфиг');
+  }
+  coursesConfig = JSON.parse(JSON.stringify(DEFAULT_COURSES));
+}
+
+function saveConfig() {
+  localStorage.setItem(STORAGE_KEY_COURSES, JSON.stringify(coursesConfig));
+}
+
+// Извлечение базового URL таблицы из любой ссылки Google Sheets
+function normalizeSheetBaseUrl(inputUrl) {
+  const trimmed = inputUrl.trim();
+  const match = trimmed.match(/https:\/\/docs\.google\.com\/spreadsheets\/(?:u\/\d+\/)?d\/([a-zA-Z0-9-_]+)/);
+  if (match && match[1]) {
+    return `https://docs.google.com/spreadsheets/d/${match[1]}`;
+  }
+  return null;
+}
+
+// 2. Расчёт числителя и знаменателя
+// Опорная дата: неделя с пятницей 30 октября 2026 г. (понедельник 26 октября 2026 г.) = ЧИСЛИТЕЛЬ
+function getWeekParity(date = new Date()) {
+  const anchorMonday = new Date(2026, 9, 26, 0, 0, 0);
+  const current = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const dayOfWeek = (current.getDay() + 6) % 7; // 0 = Понедельник ... 6 = Воскресенье
+  const currentMonday = new Date(current);
+  currentMonday.setDate(current.getDate() - dayOfWeek);
+
+  const diffWeeks = Math.round((currentMonday - anchorMonday) / (7 * 24 * 60 * 60 * 1000));
+  const isNumerator = Math.abs(diffWeeks % 2) === 0;
+
+  return {
+    thisWeek: isNumerator ? 'numerator' : 'denominator',
+    nextWeek: isNumerator ? 'denominator' : 'numerator',
+    dayIndex: dayOfWeek
+  };
+}
+
+function renderWeekBanners() {
+  const now = new Date();
+  const parity = getWeekParity(now);
+  const daysRu = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+  const dateStr = now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
+  $('current-date-badge').textContent = `${daysRu[now.getDay()]}, ${dateStr}`;
+
+  const apply = (banner, label, type, current) => {
+    const num = type === 'numerator';
+    banner.className = 'week-chip ' + (num ? 'week-num' : 'week-den') + (current ? ' week-current' : '');
+    label.textContent = num ? 'Числитель (белая)' : 'Знаменатель (синяя)';
+  };
+  apply($('this-week-banner'), $('this-week-label'), parity.thisWeek, true);
+  apply($('next-week-banner'), $('next-week-label'), parity.nextWeek, false);
+}
+
+// 3. Загрузка данных из Google Таблицы через JSONP (работает без CORS на GitHub Pages)
+function fetchSheetData(baseSheetUrl, sheetName) {
+  return new Promise((resolve, reject) => {
+    const callbackName = 'gvizCb_' + Math.random().toString(36).substring(2, 9);
+    const script = document.createElement('script');
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error('Превышено время ожидания ответа от таблицы'));
+    }, 10000);
+
+    function cleanup() {
+      clearTimeout(timeout);
+      delete window[callbackName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    }
+
+    window[callbackName] = function (response) {
+      cleanup();
+      if (response && response.status === 'ok' && response.table) {
+        resolve(response.table);
+      } else {
+        reject(new Error('Лист не найден или доступ к таблице ограничен'));
+      }
+    };
+
+    script.onerror = () => {
+      cleanup();
+      reject(new Error('Ошибка подключения к Google Таблицам'));
+    };
+
+    script.src = `${baseSheetUrl}/gviz/tq?tqx=out:json;responseHandler:${callbackName}&sheet=${encodeURIComponent(sheetName)}`;
+    document.body.appendChild(script);
+  });
+}
+
+// 4. Парсер объединённых ячеек (1-я строка времени — Числитель, 2-я строка — Знаменатель)
+function parseScheduleTable(table) {
+  const rawRows = (table.rows || []).map(r =>
+    (r.c || []).map(cell => (cell && cell.v !== null && cell.v !== undefined) ? String(cell.v).trim() : '')
+  );
+
+  const validDays = ['понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
+  const daysMap = new Map();
+
+  let currentDay = '';
+  let lastTime = '';
+  let slotCounter = 0;
+
+  for (let i = 0; i < rawRows.length; i++) {
+    const row = rawRows[i];
+    const colDay = (row[0] || '').trim();
+    const colTime = (row[1] || '').trim();
+    const colChange = (row[2] || '').trim();
+    const colSubject = (row[3] || '').trim();
+    const colTeacher = (row[4] || '').trim();
+    const colRoom = (row[5] || '').trim();
+    const colType = (row[6] || '').trim();
+
+    if (colDay && validDays.includes(colDay.toLowerCase())) {
+      currentDay = colDay.charAt(0).toUpperCase() + colDay.slice(1).toLowerCase();
+      if (!daysMap.has(currentDay)) {
+        daysMap.set(currentDay, []);
+      }
+    }
+
+    if (!currentDay) continue;
+
+    const timeRegex = /\d{1,2}[:.]\d{2}\s*-\s*\d{1,2}[:.]\d{2}/;
+    if (colTime && timeRegex.test(colTime)) {
+      if (colTime !== lastTime) {
+        lastTime = colTime;
+        slotCounter = 0;
+      } else {
+        slotCounter = 1;
+      }
+    } else if (lastTime) {
+      slotCounter = 1;
+    } else {
+      continue;
+    }
+
+    const daySlots = daysMap.get(currentDay);
+    let timeEntry = daySlots.find(item => item.time === lastTime);
+    if (!timeEntry) {
+      timeEntry = {
+        time: lastTime,
+        numerator: null,
+        denominator: null
+      };
+      daySlots.push(timeEntry);
+    }
+
+    const lessonData = {
+      changes: colChange,
+      subject: colSubject,
+      teacher: colTeacher,
+      room: colRoom,
+      type: colType
+    };
+
+    if (slotCounter === 0 && !timeEntry.numerator) {
+      timeEntry.numerator = lessonData;
+    } else {
+      timeEntry.denominator = lessonData;
+    }
+  }
+
+  return Array.from(daysMap.entries()).map(([day, slots]) => ({ day, slots }));
+}
+
+// 5. Отрисовка карточек расписания
+function renderHalfCard(lesson, parityType, delay = 0) {
+  const num = parityType === 'numerator';
+  const has = lesson && (lesson.subject || lesson.changes);
+  return `
+    <div class="half-card ${num ? 'card-numerator' : 'card-denominator'} rounded-2xl p-4 flex flex-col justify-between min-h-[104px]" style="--d:${delay}ms">
+      <div class="flex items-center justify-between gap-2 mb-2">
+        <span class="badge text-[11px] px-2.5 py-0.5 rounded-md">${num ? 'Числитель' : 'Знаменатель'}</span>
+        ${lesson && lesson.type ? `<span class="chip text-xs px-2 py-0.5 rounded-md">${esc(lesson.type)}</span>` : ''}
+      </div>
+      ${has ? `
+        <div class="space-y-1.5 my-auto">
+          ${lesson.subject ? `<div class="text-sm sm:text-[15px] leading-snug">${esc(lesson.subject)}</div>` : ''}
+          ${lesson.changes ? `<div class="note-change text-xs px-2.5 py-1 rounded-lg"><span class="ico">⚡</span> Изменение: ${esc(lesson.changes)}</div>` : ''}
+        </div>
+        <div class="card-meta flex flex-wrap items-center justify-between gap-2 mt-3 pt-2 text-xs">
+          <span>${lesson.teacher ? `👤 ${esc(lesson.teacher)}` : ''}</span>
+          <span>${lesson.room ? `🚪 Каб. ${esc(lesson.room)}` : ''}</span>
+        </div>
+      ` : `<div class="text-xs italic opacity-60 my-auto">Свободная пара (окно)</div>`}
+    </div>`;
+}
+
+let loadState = 'loading';
+
+function renderSkeleton() {
+  $('schedule-container').innerHTML = [0, 1].map(i => `<div class="skel" style="animation-delay:${i * 150}ms"></div>`).join('');
+}
+
+function renderLoadError() {
+  const c = $('schedule-container');
+  c.innerHTML = `
+    <div class="glass-panel rounded-3xl p-10 text-center day-card-animate">
+      <div class="text-3xl mb-2">🌧️</div>
+      <p class="muted text-sm">Не удалось загрузить расписание группы <strong>${esc(currentGroup)}</strong>.<br>Проверьте название листа и доступ к таблице.</p>
+      <button id="retry-btn" class="btn v-main rounded-xl px-5 py-2.5 text-xs mt-5"><span class="ico">🔄</span> Повторить</button>
+    </div>`;
+  $('retry-btn').addEventListener('click', loadCurrentSchedule);
+}
+
+function renderSchedule() {
+  const container = $('schedule-container');
+  if (loadState === 'loading') return;
+  if (loadState === 'error') return renderLoadError();
+
+  if (!cachedScheduleData.length) {
+    container.innerHTML = `
+      <div class="glass-panel rounded-3xl p-10 text-center muted day-card-animate">
+        Для группы <strong>${esc(currentGroup)}</strong> расписание в таблице пока не заполнено.
+      </div>`;
+    return;
+  }
+
+  container.innerHTML = cachedScheduleData.map((dayBlock, index) => {
+    const base = index * 70;
+    const n = dayBlock.slots.length;
+    const slotsHtml = dayBlock.slots.map((slot, si) => {
+      const d = base + 120 + si * 60;
+      const numCard = (currentFilter === 'all' || currentFilter === 'numerator') ? renderHalfCard(slot.numerator, 'numerator', d) : '';
+      const denCard = (currentFilter === 'all' || currentFilter === 'denominator') ? renderHalfCard(slot.denominator, 'denominator', d + 60) : '';
+      const gridCols = currentFilter === 'all' ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1';
+      return `
+        <div class="slot-row p-3.5 sm:p-4 rounded-2xl flex flex-col lg:flex-row gap-4 items-stretch lg:items-center">
+          <div class="lg:w-36 shrink-0 flex lg:flex-col justify-between lg:justify-center items-center lg:items-start px-2">
+            <span class="text-[11px] muted">Время пары</span>
+            <span class="text-base mt-0.5">${esc(slot.time)}</span>
+          </div>
+          <div class="flex-1 grid ${gridCols} gap-3.5">${numCard}${denCard}</div>
+        </div>`;
+    }).join('');
+
+    return `
+      <div style="--d:${base}ms" class="day-card-animate glass-panel rounded-3xl p-4 sm:p-6">
+        <div class="flex items-center justify-between mb-4 pb-3 border-b">
+          <h2 class="text-lg sm:text-xl flex items-center gap-3"><span class="day-marker"></span>${esc(dayBlock.day)}</h2>
+          <span class="pill text-xs px-2.5 py-1 rounded-full">${n} ${plural(n, ['пара', 'пары', 'пар'])}</span>
+        </div>
+        <div class="space-y-3.5">${slotsHtml}</div>
+      </div>`;
+  }).join('');
+}
+
+// 6. Управление селекторами Курса и Группы
+function populateCourseAndGroupSelects() {
+  const courseSelect = document.getElementById('course-select');
+  const groupSelect = document.getElementById('group-select');
+  const courseBadge = document.getElementById('course-badge');
+
+  courseSelect.innerHTML = coursesConfig.map(c =>
+    `<option value="${esc(c.id)}">${esc(c.name)}</option>`
+  ).join('');
+
+  const savedCourseId = localStorage.getItem(STORAGE_KEY_SELECTED_COURSE);
+  currentCourse = coursesConfig.find(c => c.id === savedCourseId) || coursesConfig[0];
+  courseSelect.value = currentCourse.id;
+  courseBadge.textContent = currentCourse.name.toUpperCase();
+
+  populateGroupSelect();
+}
+
+function populateGroupSelect() {
+  const groupSelect = document.getElementById('group-select');
+  const groups = currentCourse ? currentCourse.groups : [];
+
+  groupSelect.innerHTML = groups.map(g =>
+    `<option value="${esc(g)}">${esc(g)}</option>`
+  ).join('');
+
+  const savedGroup = localStorage.getItem(STORAGE_KEY_SELECTED_GROUP);
+  currentGroup = groups.includes(savedGroup) ? savedGroup : (groups[0] || '');
+  groupSelect.value = currentGroup;
+}
+
+let loadSeq = 0;
+
+function setStatus(kind, text) {
+  const el = $('status-message');
+  el.innerHTML = `<span class="${kind === 'load' ? 'loader-dot' : 'sdot ' + kind}"></span><span>${esc(text)}</span>`;
+  restart(el, 'status-swap');
+}
+
+async function loadCurrentSchedule() {
+  if (!currentCourse || !currentGroup) return;
+  const seq = ++loadSeq;
+  loadState = 'loading';
+  setStatus('load', `Загрузка расписания «${currentGroup}» (${currentCourse.name})...`);
+  renderSkeleton();
+
+  try {
+    const table = await fetchSheetData(currentCourse.sheetUrl, currentGroup);
+    if (seq !== loadSeq) return; // пришёл устаревший ответ
+    cachedScheduleData = parseScheduleTable(table);
+    loadState = 'ok';
+    setStatus('ok', `Актуально: ${currentCourse.name} • ${currentGroup}`);
+    renderSchedule();
+  } catch (err) {
+    if (seq !== loadSeq) return;
+    console.error(err);
+    cachedScheduleData = [];
+    loadState = 'error';
+    setStatus('err', `Ошибка: не найден лист «${currentGroup}» или таблица закрыта`);
+    renderLoadError();
+  }
+}
+
+// 7. Логика Админ-панели
+let flashId = null;
+
+function renderAdminCoursesList() {
+  const listEl = $('admin-courses-list');
+  listEl.innerHTML = coursesConfig.map((course, i) => `
+    <div class="course-item ${course.id === flashId ? 'flash' : ''} p-3.5 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3" style="--d:${i * 70}ms">
+      <div>
+        <div class="text-sm">${esc(course.name)}</div>
+        <div class="text-[11px] muted mt-0.5">Групп: ${course.groups.length} (${esc(course.groups.join(', '))})</div>
+      </div>
+      <div class="flex items-center gap-2 shrink-0">
+        <button data-edit-id="${esc(course.id)}" class="edit-course-btn btn v-soft px-3 py-1.5 rounded-lg text-xs"><span class="ico">✏️</span> Изменить</button>
+        ${coursesConfig.length > 1 ? `<button data-delete-id="${esc(course.id)}" class="delete-course-btn btn v-rose px-3 py-1.5 rounded-lg text-xs" aria-label="Удалить курс"><span class="ico">🗑️</span></button>` : ''}
+      </div>
+    </div>`).join('');
+  flashId = null;
+
+  listEl.querySelectorAll('.edit-course-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = coursesConfig.find(c => c.id === btn.dataset.editId);
+      if (!target) return;
+      $('admin-course-name').value = target.name;
+      $('admin-sheet-url').value = target.sheetUrl;
+      $('admin-groups-list').value = target.groups.join(', ');
+      const form = $('admin-form');
+      form.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      restart(form, 'form-flash');
+    });
+  });
+
+  listEl.querySelectorAll('.delete-course-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      btn.closest('.course-item').classList.add('removing');
+      setTimeout(() => {
+        coursesConfig = coursesConfig.filter(c => c.id !== btn.dataset.deleteId);
+        saveConfig();
+        populateCourseAndGroupSelects();
+        renderAdminCoursesList();
+        loadCurrentSchedule();
+        toast('Курс удалён', 'info', '🗑️');
+      }, 300);
+    });
+  });
+}
+
+function showAdminFeedback(message, isSuccess = true) {
+  const box = $('admin-feedback');
+  box.className = '';
+  void box.offsetWidth;
+  box.className = `feedback ${isSuccess ? 'ok' : 'err'} text-xs rounded-xl p-3`;
+  box.textContent = message;
+}
+
+// 8. Инициализация приложения
+document.addEventListener('DOMContentLoaded', () => {
+  loadConfig();
+  renderWeekBanners();
+  populateCourseAndGroupSelects();
+  loadCurrentSchedule();
+
+  // Переключение курса
+  document.getElementById('course-select').addEventListener('change', (e) => {
+    const selected = coursesConfig.find(c => c.id === e.target.value);
+    if (!selected) return;
+    currentCourse = selected;
+    flash(e.target);
+    localStorage.setItem(STORAGE_KEY_SELECTED_COURSE, currentCourse.id);
+    document.getElementById('course-badge').textContent = currentCourse.name.toUpperCase();
+    populateGroupSelect();
+    loadCurrentSchedule();
+  });
+
+  // Переключение группы
+  document.getElementById('group-select').addEventListener('change', (e) => {
+    currentGroup = e.target.value;
+    flash(e.target);
+    localStorage.setItem(STORAGE_KEY_SELECTED_GROUP, currentGroup);
+    loadCurrentSchedule();
+  });
+
+  // Кнопки фильтрации недель
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentFilter = btn.dataset.filter;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active-filter'));
+      btn.classList.add('active-filter');
+      renderSchedule();
+    });
+  });
+
+  // Вход, выход и модальные окна
+  const adminModal = $('admin-modal'), loginModal = $('login-modal');
+  const loginForm = $('login-form'), loginUser = $('login-user'), loginPass = $('login-pass');
+  const loginSubmit = $('login-submit'), loginError = $('login-error');
+
+  const openAdmin = () => { renderAdminCoursesList(); openModal(adminModal); };
+  function openLogin() {
+    loginForm.reset();
+    loginError.classList.remove('show');
+    loginPass.type = 'password';
+    $('toggle-pass').querySelector('.ico').textContent = '👁️';
+    loginSubmit.classList.remove('v-ok');
+    loginSubmit.querySelector('.lbl').textContent = 'Войти';
+    $('login-lock').textContent = '🔒';
+    openModal(loginModal, loginUser);
+  }
+
+  $('open-admin-btn').addEventListener('click', () => (isAdmin ? openAdmin() : openLogin()));
+  $('close-admin-btn').addEventListener('click', () => closeModal(adminModal));
+  $('login-cancel').addEventListener('click', () => closeModal(loginModal));
+  [adminModal, loginModal].forEach(m => m.addEventListener('mousedown', e => { if (e.target === m) closeModal(m); }));
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') [loginModal, adminModal].forEach(closeModal); });
+
+  $('toggle-pass').addEventListener('click', e => {
+    const show = loginPass.type === 'password';
+    loginPass.type = show ? 'text' : 'password';
+    const ico = e.currentTarget.querySelector('.ico');
+    ico.textContent = show ? '🙈' : '👁️';
+    restart(ico, 'pop');
+    loginPass.focus();
+  });
+
+  loginForm.addEventListener('submit', e => {
+    e.preventDefault();
+    setLoading(loginSubmit, true);
+    loginError.classList.remove('show');
+    setTimeout(() => {
+      setLoading(loginSubmit, false);
+      if (credentialsValid(loginUser.value, loginPass.value)) {
+        setAdmin(true);
+        loginSubmit.classList.add('v-ok');
+        loginSubmit.querySelector('.lbl').textContent = 'Готово!';
+        const lock = $('login-lock');
+        lock.textContent = '🔓';
+        restart(lock, 'pop');
+        setTimeout(() => { closeModal(loginModal); setTimeout(() => { openAdmin(); toast('Добро пожаловать в админ-панель', 'ok', '🔓'); }, 240); }, 650);
+      } else {
+        loginError.textContent = 'Неверный логин или пароль. Проверьте раскладку и регистр.';
+        loginError.classList.add('show');
+        restart(loginModal.querySelector('.modal-content'), 'shake');
+        loginPass.value = '';
+        loginPass.focus();
+      }
+    }, 500);
+  });
+
+  $('logout-btn').addEventListener('click', () => {
+    setAdmin(false);
+    closeModal(adminModal);
+    toast('Вы вышли из админ-панели', 'info', '🚪');
+  });
+
+  // Проверка связи с таблицей в Админ-панели
+  $('test-sheet-btn').addEventListener('click', async (e) => {
+    const btn = e.currentTarget;
+    const baseUrl = normalizeSheetBaseUrl($('admin-sheet-url').value);
+    const firstGroup = $('admin-groups-list').value.split(',').map(s => s.trim()).filter(Boolean)[0];
+
+    if (!baseUrl || !firstGroup) {
+      showAdminFeedback('Укажите корректную ссылку на Google Таблицу и хотя бы одну группу.', false);
+      return;
+    }
+
+    showAdminFeedback(`Проверяем доступ к листу «${firstGroup}»...`, true);
+    setLoading(btn, true);
+    try {
+      await fetchSheetData(baseUrl, firstGroup);
+      showAdminFeedback(`Успешно! Таблица доступна, лист «${firstGroup}» прочитан корректно.`, true);
+    } catch (err) {
+      showAdminFeedback(`Не удалось прочитать лист «${firstGroup}». Проверьте название вкладки и открыт ли доступ по ссылке.`, false);
+    } finally {
+      setLoading(btn, false);
+    }
+  });
+
+  // Сохранение курса или обновление существующего
+  document.getElementById('admin-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = document.getElementById('admin-course-name').value.trim();
+    const rawUrl = document.getElementById('admin-sheet-url').value.trim();
+    const rawGroups = document.getElementById('admin-groups-list').value;
+
+    const baseUrl = normalizeSheetBaseUrl(rawUrl);
+    const groups = rawGroups.split(',').map(g => g.trim()).filter(Boolean);
+
+    if (!baseUrl) {
+      showAdminFeedback('Некорректная ссылка на Google Таблицу.', false);
+      return;
+    }
+    if (!groups.length) {
+      showAdminFeedback('Добавьте хотя бы одну группу через запятую.', false);
+      return;
+    }
+
+    const existingIndex = coursesConfig.findIndex(c => c.name.toLowerCase() === name.toLowerCase());
+    if (existingIndex >= 0) {
+      coursesConfig[existingIndex].sheetUrl = baseUrl;
+      coursesConfig[existingIndex].groups = groups;
+      currentCourse = coursesConfig[existingIndex];
+    } else {
+      const newCourse = {
+        id: 'course-' + Date.now(),
+        name,
+        sheetUrl: baseUrl,
+        groups
+      };
+      coursesConfig.push(newCourse);
+      currentCourse = newCourse;
+    }
+
+    flashId = currentCourse.id;
+    saveConfig();
+    localStorage.setItem(STORAGE_KEY_SELECTED_COURSE, currentCourse.id);
+    populateCourseAndGroupSelects();
+    renderAdminCoursesList();
+    loadCurrentSchedule();
+    showAdminFeedback(`Курс «${name}» (${groups.length} гр.) успешно сохранён!`, true);
+    e.target.reset();
+  });
+
+  // Сброс к стандартным настройкам
+  document.getElementById('reset-defaults-btn').addEventListener('click', () => {
+    localStorage.removeItem(STORAGE_KEY_COURSES);
+    loadConfig();
+    populateCourseAndGroupSelects();
+    renderAdminCoursesList();
+    loadCurrentSchedule();
+    toast('Настройки сброшены к стандартным', 'info', '♻️');
+  });
+
+  // Копирование JSON конфига для вставки в код сайта
+  $('copy-config-btn').addEventListener('click', async (e) => {
+    const btn = e.currentTarget, lbl = btn.querySelector('.lbl');
+    const text = `const DEFAULT_COURSES = ${JSON.stringify(coursesConfig, null, 2)};`;
+    let ok = false;
+    try { await navigator.clipboard.writeText(text); ok = true; } catch (err) {
+      const ta = document.createElement('textarea');
+      ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
+      document.body.appendChild(ta); ta.select();
+      try { ok = document.execCommand('copy'); } catch (e2) {}
+      ta.remove();
+    }
+    if (ok) {
+      lbl.textContent = 'Скопировано ✓';
+      restart(btn, 'v-ok');
+      toast('Код DEFAULT_COURSES скопирован. Замените им блок в начале <script> файла index.html.', 'ok', '📋');
+      setTimeout(() => { lbl.textContent = 'Скопировать конфиг'; btn.classList.remove('v-ok'); }, 2200);
+    } else {
+      toast('Не удалось скопировать. Попробуйте ещё раз.', 'err', '⚠️');
+    }
+  });
+});
+</script>
+</body>
+</html>
