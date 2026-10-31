@@ -167,6 +167,10 @@ input::placeholder,textarea::placeholder{color:#8A86AE}
 @keyframes toastOut{to{opacity:0;transform:translateX(60px) scale(.9)}}
 @keyframes bar{to{transform:scaleX(0)}}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+.seg-btn{border:1.5px solid #D9D0F5;background:#fff;color:var(--ink);transition:background .25s,transform .2s,box-shadow .25s}
+.seg-btn:hover{transform:translateY(-1px)}
+.seg-btn.on{background:linear-gradient(135deg,#C6BBF8,#B0C7FB);color:#2C2656;border-color:transparent;box-shadow:0 8px 16px -10px rgba(110,96,190,.7)}
+.my-bar{background:rgba(243,239,250,.8);border:1px solid var(--line)}
 </style>
 </head>
 <body class="min-h-screen pb-20 relative overflow-x-hidden">
@@ -182,7 +186,7 @@ input::placeholder,textarea::placeholder{color:#8A86AE}
       <div>
         <div class="flex flex-wrap items-center gap-2">
           <span id="course-badge" class="px-3 py-0.5 text-xs rounded-full border">
-            ПОЛИТЕХ 
+            3 КУРС • ОФО
           </span>
           <span id="current-date-badge" class="text-xs muted"></span>
         </div>
@@ -202,7 +206,12 @@ input::placeholder,textarea::placeholder{color:#8A86AE}
           <strong id="next-week-label" class="text-sm">...</strong>
         </div>
 
-        <button id="open-admin-btn" class="ml-auto md:ml-2 px-3.5 py-2 rounded-xl text-xs muted border flex items-center gap-2 btn v-soft">
+        <button id="open-cabinet-btn" class="hidden ml-auto md:ml-2 px-3.5 py-2 rounded-xl text-xs border flex items-center gap-2 btn v-main">
+          <span class="ico">👤</span>
+          <span id="cabinet-btn-label">Войти</span>
+        </button>
+
+        <button id="open-admin-btn" class="px-3.5 py-2 rounded-xl text-xs muted border flex items-center gap-2 btn v-soft">
           <span class="ico">⚙️</span>
           <span>Админ-панель</span>
         </button>
@@ -214,7 +223,13 @@ input::placeholder,textarea::placeholder{color:#8A86AE}
   <section class="max-w-6xl mx-auto px-4 mt-6 relative z-10">
     <div class="glass-panel rounded-2xl p-4 md:p-5 flex flex-col lg:flex-row gap-4 items-stretch lg:items-center justify-between">
       
-      <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
+      <!-- Личная группа (если пользователь вошёл через Telegram) -->
+      <div id="my-group-bar" class="hidden my-bar rounded-2xl px-4 py-3 flex flex-wrap items-center justify-between gap-3 flex-1">
+        <div id="my-group-text" class="text-sm"></div>
+        <button id="toggle-mode-btn" type="button" class="btn v-soft px-3.5 py-2 rounded-xl text-xs"></button>
+      </div>
+
+      <div id="selectors-wrap" class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 flex-1">
         <!-- Выбор курса -->
         <div class="flex flex-col flex-1 sm:max-w-[220px]">
           <label for="course-select" class="text-[11px] muted mb-1">
@@ -357,6 +372,17 @@ input::placeholder,textarea::placeholder{color:#8A86AE}
         </div>
       </div>
 
+      <!-- Пользователи бота -->
+      <div id="admin-users-section" class="hidden mt-7 pt-5 border-t">
+        <div class="flex items-center justify-between gap-3 mb-3">
+          <h3 class="text-sm">Пользователи <span id="admin-users-count" class="muted"></span></h3>
+          <button id="refresh-users-btn" type="button" class="text-[11px] btn v-link"><span class="ico">🔄</span> Обновить</button>
+        </div>
+        <input id="admin-users-search" type="search" placeholder="Поиск по имени, курсу или группе" class="w-full border rounded-xl px-3.5 py-2.5 text-sm focus:outline-none mb-3" />
+        <div id="admin-users-list" class="space-y-2 max-h-72 overflow-y-auto pr-1"></div>
+        <p class="text-[11px] muted mt-2">Формат: имя: курс: группа. 🔔 — уведомления включены.</p>
+      </div>
+
       <!-- Экспорт для GitHub Pages -->
       <div class="mt-6 pt-4 border-t flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 export-box p-4 rounded-2xl">
         <div class="text-xs muted">
@@ -397,6 +423,64 @@ input::placeholder,textarea::placeholder{color:#8A86AE}
           <button type="submit" id="login-submit" class="btn v-main flex-1 rounded-xl py-2.5 text-xs"><span class="ico">🔑</span><span class="lbl">Войти</span></button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- МОДАЛЬНОЕ ОКНО ЛИЧНОГО КАБИНЕТА -->
+  <div id="cabinet-modal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-content glass-panel w-full max-w-md rounded-3xl p-6 sm:p-8 max-h-[90vh] overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="cab-title">
+      <div class="flex items-start justify-between gap-3 pb-3 border-b">
+        <div>
+          <h2 id="cab-title" class="text-xl flex items-center gap-2"><span class="ico">👤</span> Личный кабинет</h2>
+          <p class="text-xs muted mt-1">Вход через Telegram-бота</p>
+        </div>
+        <button id="close-cabinet-btn" type="button" class="btn v-soft px-3 h-9 rounded-xl text-xs" aria-label="Закрыть">✕</button>
+      </div>
+
+      <!-- Гость -->
+      <div id="cab-guest" class="mt-5 space-y-4">
+        <p class="text-sm muted">Войдите через Telegram: выберите свою группу — сайт покажет только её, а бот будет присылать напоминание за 20 минут до начала пары.</p>
+        <a id="cab-tg-link" href="#" target="_blank" rel="noopener" class="btn v-main rounded-xl py-3 text-sm pointer-events-none opacity-60">
+          <span class="ico">✈️</span><span id="cab-tg-label">Подготовка…</span>
+        </a>
+        <div id="cab-wait" class="hidden feedback ok text-xs rounded-xl p-3">
+          В Telegram нажмите «Старт», затем «Да, войти на сайте». Вход выполнится автоматически…
+        </div>
+        <div id="cab-guest-err" class="form-error" role="alert"></div>
+      </div>
+
+      <!-- Пользователь -->
+      <div id="cab-user" class="hidden mt-5 space-y-4">
+        <div class="text-sm"><strong id="cab-name"></strong> <span id="cab-username" class="muted text-xs"></span></div>
+
+        <div>
+          <label for="cab-course" class="block text-xs muted mb-1.5">Курс</label>
+          <select id="cab-course" class="custom-select w-full border text-sm rounded-xl px-3.5 py-2.5 focus:outline-none"></select>
+        </div>
+        <div>
+          <label for="cab-group" class="block text-xs muted mb-1.5">Группа</label>
+          <select id="cab-group" class="custom-select w-full border text-sm rounded-xl px-3.5 py-2.5 focus:outline-none"></select>
+        </div>
+
+        <div>
+          <span class="block text-xs muted mb-1.5">Что показывать на сайте</span>
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" data-mode="mine" class="seg-btn rounded-xl px-3 py-2.5 text-xs">🎯 Только моя группа</button>
+            <button type="button" data-mode="all" class="seg-btn rounded-xl px-3 py-2.5 text-xs">🗂️ Все группы и курсы</button>
+          </div>
+        </div>
+
+        <label class="flex items-start gap-3 text-sm cursor-pointer">
+          <input id="cab-notify" type="checkbox" class="mt-1 h-4 w-4" style="accent-color:#8F7DE8" />
+          <span>Уведомлять в Telegram за 20 минут до пары<br><span class="text-[11px] muted">Только по вашей группе. Можно выключить командой /off в боте.</span></span>
+        </label>
+
+        <div id="cab-feedback" class="text-xs hidden rounded-xl p-3"></div>
+        <div class="flex gap-3 pt-1">
+          <button id="cab-logout" type="button" class="btn v-soft flex-1 rounded-xl py-2.5 text-xs"><span class="ico">🚪</span> Выйти</button>
+          <button id="cab-save" type="button" class="btn v-main flex-1 rounded-xl py-2.5 text-xs"><span class="ico">💾</span><span class="lbl">Сохранить</span></button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -505,7 +589,7 @@ const credentialsValid = (login, pass) => sha256(AUTH_SALT + login.trim().toLowe
    Хранит общий список курсов и сам определяет группы по вкладкам таблиц — для ВСЕХ пользователей.
    Инструкция по развёртыванию — в файле backend/Code.gs. Вставьте сюда адрес веб-приложения (…/exec).
    Если оставить пустым — сайт работает по-старому, без общего хранилища. */
-const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbyiEubiPp6TsZ6tDJ3InuKQrPx2a8zeVsM8cagKkAQc76mQn4vhRynyxt6sDIn_BS24/exec';
+const BACKEND_URL = '';
 const STORAGE_KEY_TOKEN = 'schedule_portal_admin_token';
 const STORAGE_KEY_REMOTE = 'schedule_portal_remote_cfg_v1';
 
@@ -519,6 +603,42 @@ function setAdmin(on, token) {
     if (on && token) sessionStorage.setItem(STORAGE_KEY_TOKEN, token);
     if (!on) sessionStorage.removeItem(STORAGE_KEY_TOKEN);
   } catch (e) {}
+}
+
+/* ===== Личный кабинет пользователя (вход через Telegram) ===== */
+const STORAGE_KEY_USER_TOKEN = 'schedule_portal_user_token';
+const STORAGE_KEY_USER = 'schedule_portal_user_profile';
+const STORAGE_KEY_TG_REQ = 'schedule_portal_tg_req';
+let userToken = '';
+let userProfile = null;   // { name, username, course (id), group, notify, mode: 'mine' | 'all' }
+try {
+  userToken = localStorage.getItem(STORAGE_KEY_USER_TOKEN) || '';
+  userProfile = userToken ? JSON.parse(localStorage.getItem(STORAGE_KEY_USER) || 'null') : null;
+} catch (e) {}
+
+function saveUser() {
+  try {
+    if (userToken) {
+      localStorage.setItem(STORAGE_KEY_USER_TOKEN, userToken);
+      localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(userProfile));
+    } else {
+      localStorage.removeItem(STORAGE_KEY_USER_TOKEN);
+      localStorage.removeItem(STORAGE_KEY_USER);
+    }
+  } catch (e) {}
+}
+
+// Личная группа пользователя существует в текущих данных?
+function myCourse() {
+  return userProfile && userProfile.course ? coursesConfig.find(c => c.id === userProfile.course) : null;
+}
+function hasMyGroup() {
+  const c = myCourse();
+  return !!(c && userProfile.group && getGroups(c).includes(userProfile.group));
+}
+// Показывать ли только свою группу (вошёл, группа выбрана, режим «моя группа»)
+function personalActive() {
+  return hasMyGroup() && userProfile.mode !== 'all';
 }
 
 // JSONP-запрос (чтение с бэкенда без проблем с CORS)
@@ -726,7 +846,7 @@ async function discoverGroups(baseUrl) {
   // Через бэкенд: ключ не нужен, сервер сам читает вкладки таблицы
   if (BACKEND_URL) {
     try {
-      const r = await jsonp(BACKEND_URL + '?action=groups&url=' + encodeURIComponent(baseUrl));
+      const r = await jsonp(BACKEND_URL + '?action=groups&url=' + encodeURIComponent(baseUrl) + '&token=' + encodeURIComponent(getToken()));
       if (r && r.ok && r.groups && r.groups.length) return { groups: r.groups, source: 'backend' };
     } catch (err) {
       console.warn('Бэкенд не вернул группы:', err);
@@ -1005,11 +1125,12 @@ function populateCourseAndGroupSelects() {
   ).join('');
 
   const savedCourseId = localStorage.getItem(STORAGE_KEY_SELECTED_COURSE);
-  currentCourse = coursesConfig.find(c => c.id === savedCourseId) || coursesConfig[0];
+  currentCourse = (personalActive() && myCourse()) || coursesConfig.find(c => c.id === savedCourseId) || coursesConfig[0];
   courseSelect.value = currentCourse.id;
   courseBadge.textContent = currentCourse.name.toUpperCase();
 
   populateGroupSelect();
+  applyPersonalUI();
 }
 
 function populateGroupSelect() {
@@ -1021,7 +1142,9 @@ function populateGroupSelect() {
   ).join('');
 
   const savedGroup = localStorage.getItem(STORAGE_KEY_SELECTED_GROUP);
-  currentGroup = groups.includes(savedGroup) ? savedGroup : (groups[0] || '');
+  currentGroup = (personalActive() && currentCourse.id === userProfile.course)
+    ? userProfile.group
+    : (groups.includes(savedGroup) ? savedGroup : (groups[0] || ''));
   groupSelect.value = currentGroup;
 }
 
@@ -1119,6 +1242,151 @@ function showAdminFeedback(message, isSuccess = true) {
   box.textContent = message;
 }
 
+// 7.1 Личный кабинет: интерфейс и вход через Telegram
+function applyPersonalUI() {
+  const btn = $('open-cabinet-btn');
+  if (!BACKEND_URL) { btn.classList.add('hidden'); return; }
+  btn.classList.remove('hidden');
+  $('cabinet-btn-label').textContent = userToken && userProfile ? (userProfile.name || 'Кабинет').split(' ')[0] : 'Войти';
+
+  const active = personalActive();
+  const has = hasMyGroup();
+  $('selectors-wrap').classList.toggle('hidden', active);
+  $('my-group-bar').classList.toggle('hidden', !has);
+  if (has) {
+    $('my-group-text').innerHTML = `👤 Моя группа: <strong>${esc(userProfile.group)}</strong> <span class="muted text-xs">• ${esc(myCourse().name)}</span>`;
+    $('toggle-mode-btn').innerHTML = active
+      ? '<span class="ico">🗂️</span> Все группы и курсы'
+      : '<span class="ico">🎯</span> Только моя группа';
+  }
+}
+
+async function refreshProfile() {
+  if (!BACKEND_URL || !userToken) return;
+  try {
+    const r = await backendPost({ action: 'me', token: userToken });
+    if (r && r.ok) {
+      const changed = JSON.stringify(r.user) !== JSON.stringify(userProfile);
+      userProfile = r.user; saveUser();
+      if (changed) { populateCourseAndGroupSelects(); loadCurrentSchedule(); }
+    } else if (r && r.error === 'auth') {
+      userToken = ''; userProfile = null; saveUser();
+      populateCourseAndGroupSelects(); loadCurrentSchedule();
+    }
+  } catch (err) { console.warn('Не удалось обновить профиль:', err); }
+}
+
+let tgPollTimer = null;
+function stopTgPoll() { clearTimeout(tgPollTimer); tgPollTimer = null; }
+
+function finishTgLogin(r) {
+  stopTgPoll();
+  try { localStorage.removeItem(STORAGE_KEY_TG_REQ); } catch (e) {}
+  userToken = r.token; userProfile = r.user; saveUser();
+  populateCourseAndGroupSelects();
+  loadCurrentSchedule();
+  toast(`Вы вошли как ${userProfile.name}`, 'ok', '✈️');
+  if ($('cabinet-modal').classList.contains('open')) renderCabinet();
+  else if (!userProfile.group) openCabinet();
+}
+
+function pollTgLogin(req, startedAt) {
+  stopTgPoll();
+  const tick = async () => {
+    if (userToken) return;
+    if (Date.now() - startedAt > 10 * 60 * 1000) {
+      try { localStorage.removeItem(STORAGE_KEY_TG_REQ); } catch (e) {}
+      $('cab-wait').classList.add('hidden');
+      $('cab-guest-err').textContent = 'Время ожидания вышло. Нажмите «Войти через Telegram» ещё раз.';
+      $('cab-guest-err').classList.add('show');
+      prepareTgLogin(true);
+      return;
+    }
+    try {
+      const r = await jsonp(BACKEND_URL + '?action=tg_check&req=' + req);
+      if (r && r.ok && r.token) return finishTgLogin(r);
+      if (r && !r.ok && r.error === 'expired') {
+        try { localStorage.removeItem(STORAGE_KEY_TG_REQ); } catch (e) {}
+        $('cab-wait').classList.add('hidden');
+        prepareTgLogin(true);
+        return;
+      }
+    } catch (err) { /* сеть моргнула — пробуем ещё раз */ }
+    tgPollTimer = setTimeout(tick, 2000);
+  };
+  tick();
+}
+
+// Готовим ссылку на бота заранее, чтобы клик был «чистым» переходом (не блокируется браузером)
+async function prepareTgLogin(force = false) {
+  const link = $('cab-tg-link'), label = $('cab-tg-label');
+  if (!force) {
+    try {
+      const saved = JSON.parse(localStorage.getItem(STORAGE_KEY_TG_REQ) || 'null');
+      if (saved && Date.now() - saved.ts < 9 * 60 * 1000) {
+        link.href = saved.link;
+        link.classList.remove('pointer-events-none', 'opacity-60');
+        label.textContent = 'Войти через Telegram';
+        $('cab-wait').classList.remove('hidden');
+        pollTgLogin(saved.id, saved.ts);
+        return;
+      }
+    } catch (e) {}
+  }
+  link.classList.add('pointer-events-none', 'opacity-60');
+  label.textContent = 'Подготовка…';
+  try {
+    const r = await jsonp(BACKEND_URL + '?action=tg_start');
+    if (!r || !r.ok) throw new Error((r && r.error) || 'tg_start');
+    link.href = r.link;
+    link.classList.remove('pointer-events-none', 'opacity-60');
+    label.textContent = 'Войти через Telegram';
+    link.onclick = () => {
+      try { localStorage.setItem(STORAGE_KEY_TG_REQ, JSON.stringify({ id: r.req, link: r.link, ts: Date.now() })); } catch (e) {}
+      $('cab-guest-err').classList.remove('show');
+      $('cab-wait').classList.remove('hidden');
+      pollTgLogin(r.req, Date.now());
+    };
+  } catch (err) {
+    label.textContent = 'Не удалось подключиться';
+    $('cab-guest-err').textContent = err.message === 'no_bot'
+      ? 'Бот ещё не настроен (BOT_TOKEN / BOT_USERNAME в свойствах скрипта).'
+      : 'Нет связи с сервером. Проверьте интернет и BACKEND_URL.';
+    $('cab-guest-err').classList.add('show');
+  }
+}
+
+let cabDraft = null;
+function fillCabinetGroups() {
+  const c = coursesConfig.find(x => x.id === cabDraft.course);
+  const groups = c ? getGroups(c) : [];
+  $('cab-group').innerHTML = `<option value="">— не выбрана —</option>` + groups.map(g => `<option value="${esc(g)}">${esc(g)}</option>`).join('');
+  if (!groups.includes(cabDraft.group)) cabDraft.group = '';
+  $('cab-group').value = cabDraft.group;
+}
+function renderCabinet() {
+  const guest = !userToken || !userProfile;
+  $('cab-guest').classList.toggle('hidden', !guest);
+  $('cab-user').classList.toggle('hidden', guest);
+  if (guest) { $('cab-guest-err').classList.remove('show'); prepareTgLogin(); return; }
+
+  $('cab-name').textContent = userProfile.name;
+  $('cab-username').textContent = userProfile.username ? '@' + userProfile.username : '';
+  cabDraft = {
+    course: myCourse() ? userProfile.course : (coursesConfig[0] && coursesConfig[0].id) || '',
+    group: userProfile.group || '',
+    notify: !!userProfile.notify,
+    mode: userProfile.mode === 'all' ? 'all' : 'mine'
+  };
+  $('cab-course').innerHTML = coursesConfig.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
+  $('cab-course').value = cabDraft.course;
+  fillCabinetGroups();
+  $('cab-notify').checked = cabDraft.notify;
+  document.querySelectorAll('#cab-user .seg-btn').forEach(b => b.classList.toggle('on', b.dataset.mode === cabDraft.mode));
+  $('cab-feedback').classList.add('hidden');
+}
+function openCabinet() { renderCabinet(); openModal($('cabinet-modal')); }
+
 // 8. Инициализация приложения
 document.addEventListener('DOMContentLoaded', () => {
   loadConfig();
@@ -1129,7 +1397,116 @@ document.addEventListener('DOMContentLoaded', () => {
   syncAll();                                            // сразу сверяем курсы и группы с сервером/таблицей
   setInterval(syncAll, GROUPS_REFRESH_MS);              // и периодически
   document.addEventListener('visibilitychange', () => { if (!document.hidden) syncAll(); });
-  if (BACKEND_URL) { const box = document.querySelector('.export-box'); if (box) box.style.display = 'none'; }
+  if (BACKEND_URL) {
+    const box = document.querySelector('.export-box'); if (box) box.style.display = 'none';
+    $('admin-users-section').classList.remove('hidden');
+    refreshProfile();
+    // вернулись из Telegram с незавершённым входом — продолжаем ждать подтверждение
+    try {
+      const pending = JSON.parse(localStorage.getItem(STORAGE_KEY_TG_REQ) || 'null');
+      if (!userToken && pending && Date.now() - pending.ts < 10 * 60 * 1000) pollTgLogin(pending.id, pending.ts);
+    } catch (e) {}
+  }
+
+  // --- Личный кабинет ---
+  const cabinetModal = $('cabinet-modal');
+  $('open-cabinet-btn').addEventListener('click', openCabinet);
+  $('close-cabinet-btn').addEventListener('click', () => closeModal(cabinetModal));
+  cabinetModal.addEventListener('mousedown', e => { if (e.target === cabinetModal) closeModal(cabinetModal); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(cabinetModal); });
+
+  $('cab-course').addEventListener('change', e => { cabDraft.course = e.target.value; cabDraft.group = ''; fillCabinetGroups(); });
+  $('cab-group').addEventListener('change', e => { cabDraft.group = e.target.value; });
+  $('cab-notify').addEventListener('change', e => { cabDraft.notify = e.target.checked; });
+  document.querySelectorAll('#cab-user .seg-btn').forEach(b => b.addEventListener('click', () => {
+    cabDraft.mode = b.dataset.mode;
+    document.querySelectorAll('#cab-user .seg-btn').forEach(x => x.classList.toggle('on', x === b));
+  }));
+
+  $('cab-save').addEventListener('click', async e => {
+    const btn = e.currentTarget, fb = $('cab-feedback');
+    const showFb = (msg, ok) => { fb.className = `feedback ${ok ? 'ok' : 'err'} text-xs rounded-xl p-3`; fb.textContent = msg; };
+    setLoading(btn, true);
+    try {
+      const r = await backendPost({
+        action: 'profile', token: userToken,
+        course: cabDraft.group ? cabDraft.course : '', group: cabDraft.group,
+        notify: cabDraft.notify, mode: cabDraft.mode
+      });
+      if (r && r.ok) {
+        userProfile = r.user; saveUser();
+        populateCourseAndGroupSelects();
+        loadCurrentSchedule();
+        closeModal(cabinetModal);
+        toast(userProfile.group ? `Сохранено: ${userProfile.group}` : 'Настройки сохранены', 'ok', '✅');
+      } else if (r && r.error === 'auth') {
+        userToken = ''; userProfile = null; saveUser();
+        applyPersonalUI(); renderCabinet();
+        toast('Сессия истекла. Войдите заново.', 'err', '🔒');
+      } else {
+        showFb(r && r.error === 'bad_group' ? 'Такой группы больше нет в таблице. Выберите другую.' : 'Не удалось сохранить. Попробуйте ещё раз.', false);
+      }
+    } catch (err) {
+      showFb('Нет связи с сервером. Проверьте интернет.', false);
+    } finally {
+      setLoading(btn, false);
+    }
+  });
+
+  $('cab-logout').addEventListener('click', () => {
+    userToken = ''; userProfile = null; saveUser();
+    closeModal(cabinetModal);
+    populateCourseAndGroupSelects();
+    loadCurrentSchedule();
+    toast('Вы вышли из личного кабинета', 'info', '🚪');
+  });
+
+  // Переключатель «только моя группа / все группы» прямо на главной
+  $('toggle-mode-btn').addEventListener('click', async () => {
+    if (!userProfile) return;
+    const next = personalActive() ? 'all' : 'mine';
+    if (next === 'all') {   // запоминаем, что показывалось, чтобы селекторы открылись на той же группе
+      try {
+        localStorage.setItem(STORAGE_KEY_SELECTED_COURSE, currentCourse.id);
+        localStorage.setItem(STORAGE_KEY_SELECTED_GROUP, currentGroup);
+      } catch (e) {}
+    }
+    userProfile.mode = next; saveUser();
+    populateCourseAndGroupSelects();
+    loadCurrentSchedule();
+    try { await backendPost({ action: 'profile', token: userToken, mode: next }); } catch (e) { /* локально уже применено */ }
+  });
+
+  // --- Пользователи в админ-панели ---
+  let adminUsers = [];
+  function renderAdminUsers() {
+    const q = $('admin-users-search').value.trim().toLowerCase();
+    const list = adminUsers.filter(u => !q || `${u.name} ${u.username} ${u.course} ${u.group}`.toLowerCase().includes(q));
+    $('admin-users-count').textContent = `(${adminUsers.length})`;
+    $('admin-users-list').innerHTML = list.length ? list.map(u => `
+      <div class="course-item p-3 rounded-2xl flex items-center justify-between gap-3">
+        <div class="text-sm min-w-0 break-words">${esc(u.name)}: ${esc(u.course)}: ${esc(u.group)}</div>
+        <div class="text-[11px] muted shrink-0">${u.notify ? '🔔 ' : ''}${u.username ? '@' + esc(u.username) : ''}</div>
+      </div>`).join('') : `<div class="text-xs muted p-2">${adminUsers.length ? 'Ничего не найдено' : 'Пока никто не входил через бота'}</div>`;
+  }
+  async function loadAdminUsers() {
+    if (!BACKEND_URL) return;
+    $('admin-users-list').innerHTML = '<div class="text-xs muted p-2">Загрузка…</div>';
+    try {
+      const r = await backendPost({ action: 'users', token: getToken() });
+      if (!r || !r.ok) {
+        if (r && r.error === 'auth') { setAdmin(false); closeModal($('admin-modal')); toast('Сессия истекла. Войдите заново.', 'err', '🔒'); return; }
+        throw new Error('users');
+      }
+      adminUsers = r.users;
+      renderAdminUsers();
+    } catch (err) {
+      $('admin-users-list').innerHTML = '<div class="text-xs muted p-2">Не удалось загрузить список пользователей.</div>';
+    }
+  }
+  $('admin-users-search').addEventListener('input', renderAdminUsers);
+  $('refresh-users-btn').addEventListener('click', loadAdminUsers);
+  window.loadAdminUsers = loadAdminUsers;
 
   // Переключение курса
   document.getElementById('course-select').addEventListener('change', (e) => {
@@ -1166,7 +1543,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const loginForm = $('login-form'), loginUser = $('login-user'), loginPass = $('login-pass');
   const loginSubmit = $('login-submit'), loginError = $('login-error');
 
-  const openAdmin = () => { renderAdminCoursesList(); openModal(adminModal); };
+  const openAdmin = () => { renderAdminCoursesList(); openModal(adminModal); if (window.loadAdminUsers) window.loadAdminUsers(); };
   function openLogin() {
     loginForm.reset();
     loginError.classList.remove('show');
