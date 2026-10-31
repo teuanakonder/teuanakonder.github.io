@@ -206,7 +206,7 @@ input::placeholder,textarea::placeholder{color:#8A86AE}
           <strong id="next-week-label" class="text-sm">...</strong>
         </div>
 
-        <button id="open-cabinet-btn" class="hidden ml-auto md:ml-2 px-3.5 py-2 rounded-xl text-xs border flex items-center gap-2 btn v-main">
+        <button id="open-cabinet-btn" class="ml-auto md:ml-2 px-3.5 py-2 rounded-xl text-xs border flex items-center gap-2 btn v-main">
           <span class="ico">👤</span>
           <span id="cabinet-btn-label">Войти</span>
         </button>
@@ -589,7 +589,7 @@ const credentialsValid = (login, pass) => sha256(AUTH_SALT + login.trim().toLowe
    Хранит общий список курсов и сам определяет группы по вкладкам таблиц — для ВСЕХ пользователей.
    Инструкция по развёртыванию — в файле backend/Code.gs. Вставьте сюда адрес веб-приложения (…/exec).
    Если оставить пустым — сайт работает по-старому, без общего хранилища. */
-const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbyiEubiPp6TsZ6tDJ3InuKQrPx2a8zeVsM8cagKkAQc76mQn4vhRynyxt6sDIn_BS24/exec';
+const BACKEND_URL = '';
 const STORAGE_KEY_TOKEN = 'schedule_portal_admin_token';
 const STORAGE_KEY_REMOTE = 'schedule_portal_remote_cfg_v1';
 
@@ -1244,9 +1244,6 @@ function showAdminFeedback(message, isSuccess = true) {
 
 // 7.1 Личный кабинет: интерфейс и вход через Telegram
 function applyPersonalUI() {
-  const btn = $('open-cabinet-btn');
-  if (!BACKEND_URL) { btn.classList.add('hidden'); return; }
-  btn.classList.remove('hidden');
   $('cabinet-btn-label').textContent = userToken && userProfile ? (userProfile.name || 'Кабинет').split(' ')[0] : 'Войти';
 
   const active = personalActive();
@@ -1277,6 +1274,7 @@ async function refreshProfile() {
 }
 
 let tgPollTimer = null;
+let tgTickNow = null;
 function stopTgPoll() { clearTimeout(tgPollTimer); tgPollTimer = null; }
 
 function finishTgLogin(r) {
@@ -1306,6 +1304,7 @@ function pollTgLogin(req, startedAt) {
       const r = await jsonp(BACKEND_URL + '?action=tg_check&req=' + req);
       if (r && r.ok && r.token) return finishTgLogin(r);
       if (r && !r.ok && r.error === 'expired') {
+        if (userToken) return;
         try { localStorage.removeItem(STORAGE_KEY_TG_REQ); } catch (e) {}
         $('cab-wait').classList.add('hidden');
         prepareTgLogin(true);
@@ -1314,6 +1313,7 @@ function pollTgLogin(req, startedAt) {
     } catch (err) { /* сеть моргнула — пробуем ещё раз */ }
     tgPollTimer = setTimeout(tick, 2000);
   };
+  tgTickNow = tick;
   tick();
 }
 
@@ -1368,6 +1368,12 @@ function renderCabinet() {
   const guest = !userToken || !userProfile;
   $('cab-guest').classList.toggle('hidden', !guest);
   $('cab-user').classList.toggle('hidden', guest);
+  if (guest && !BACKEND_URL) {
+    $('cab-tg-label').textContent = 'Недоступно';
+    $('cab-guest-err').textContent = 'Личный кабинет не подключён: в index.html не указан BACKEND_URL (адрес Google Apps Script).';
+    $('cab-guest-err').classList.add('show');
+    return;
+  }
   if (guest) { $('cab-guest-err').classList.remove('show'); prepareTgLogin(); return; }
 
   $('cab-name').textContent = userProfile.name;
@@ -1407,6 +1413,11 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!userToken && pending && Date.now() - pending.ts < 10 * 60 * 1000) pollTgLogin(pending.id, pending.ts);
     } catch (e) {}
   }
+
+  // Вернулись из Telegram (Safari «замораживает» страницу) — сразу проверяем подтверждение входа
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && tgPollTimer && tgTickNow && !userToken) { clearTimeout(tgPollTimer); tgTickNow(); }
+  });
 
   // --- Личный кабинет ---
   const cabinetModal = $('cabinet-modal');
