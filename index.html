@@ -395,12 +395,20 @@ input::placeholder,textarea::placeholder{color:#8A86AE}
             </select>
           </div>
         </div>
+        <div class="mt-3">
+          <span class="block text-xs muted mb-1.5">Способы оплаты</span>
+          <div class="flex flex-wrap gap-x-5 gap-y-2">
+            <label class="flex items-center gap-2 text-sm cursor-pointer"><input id="paid-prov-cryptobot" type="checkbox" class="h-4 w-4" style="accent-color:#8F7DE8" /> 💳 Crypto Bot</label>
+            <label class="flex items-center gap-2 text-sm cursor-pointer"><input id="paid-prov-xrocket" type="checkbox" class="h-4 w-4" style="accent-color:#8F7DE8" /> 🚀 xRocket</label>
+          </div>
+          <div id="paid-prov-note" class="text-[11px] mt-1" style="color:#B4506E"></div>
+        </div>
         <div class="flex flex-col sm:flex-row gap-3 mt-3">
           <button id="paid-toggle-btn" type="button" class="btn v-main flex-1 rounded-xl py-2.5 text-xs"></button>
           <button id="paid-save-btn" type="button" class="btn v-soft rounded-xl py-2.5 px-4 text-xs"><span class="ico">💾</span> Сохранить сумму</button>
         </div>
         <div id="paid-feedback" class="hidden text-xs rounded-xl p-3 mt-3"></div>
-        <p class="text-[11px] muted mt-2">Оплата через Crypto Bot (цена в фиате — клиент платит любой монетой). Подписку можно выдать вручную кнопкой 🎁 в списке пользователей ниже.</p>
+        <p class="text-[11px] muted mt-2">Оплата через Crypto Bot и/или xRocket: цена задаётся в выбранной валюте, клиент платит любой монетой. Токены задаются в «Свойствах скрипта» (CRYPTO_PAY_TOKEN, XROCKET_PAY_TOKEN). Подписку можно выдать вручную кнопкой 🎁 в списке пользователей ниже.</p>
       </div>
 
       <!-- Пользователи бота -->
@@ -503,7 +511,7 @@ input::placeholder,textarea::placeholder{color:#8A86AE}
 
         <div id="cab-sub" class="hidden my-bar rounded-xl p-3 text-xs">
           <div id="cab-sub-text"></div>
-          <button id="cab-sub-btn" type="button" class="btn v-main rounded-xl py-2 px-4 text-xs mt-2"></button>
+          <div id="cab-sub-btns" class="flex flex-wrap gap-2 mt-2"></div>
           <div id="cab-sub-pay" class="mt-2"></div>
         </div>
 
@@ -1335,8 +1343,23 @@ const PAY_ERRORS = {
   no_crypto_token: 'Оплата ещё не настроена администратором.',
   not_paid_mode: 'Платный режим сейчас выключен.',
   auth: 'Сессия истекла — войдите через Telegram заново.',
-  no_url: 'Не удалось создать счёт. Попробуйте позже.'
+  no_url: 'Не удалось создать счёт. Попробуйте позже.',
+  no_provider: 'Способ оплаты не настроен администратором.',
+  no_xrocket_token: 'xRocket ещё не настроен администратором.',
+  bad_provider: 'Этот способ оплаты сейчас недоступен.'
 };
+const PROV = { cryptobot: { label: 'Crypto Bot', icon: '💳' }, xrocket: { label: 'xRocket', icon: '🚀' } };
+const payProviders = () => (paidSettings.providers && paidSettings.providers.length ? paidSettings.providers : ['cryptobot']);
+const payErrorText = code => PAY_ERRORS[code] || (String(code || '').startsWith('xrocket_') ? `Ошибка xRocket (${String(code).slice(8)}). Попробуйте другой способ.` : 'Не удалось создать счёт. Попробуйте позже.');
+
+// Кнопки оплаты — по одной на каждый включённый способ
+function payButtonsHtml(size) {
+  const ps = payProviders();
+  return ps.map(p => `<button type="button" data-pay="${p}" class="btn v-main rounded-xl ${size}"><span class="ico">${PROV[p].icon}</span> ${ps.length > 1 ? 'Оплатить через ' + PROV[p].label : 'Оплатить ' + esc(priceLabel())}</button>`).join('');
+}
+function bindPayButtons(root, out) {
+  root.querySelectorAll('[data-pay]').forEach(b => b.addEventListener('click', () => payFlow(b, out, b.dataset.pay)));
+}
 let payPollTimer = null, payPollUntil = 0, payTickNow = null, payBaseline = 0;
 
 function onPaid() {
@@ -1370,18 +1393,18 @@ function startPayPoll() {
 }
 
 // Создать счёт и показать ссылку на оплату в Crypto Bot
-async function payFlow(btn, out) {
+async function payFlow(btn, out, provider) {
   setLoading(btn, true);
   out.innerHTML = '';
   try {
     payBaseline = userHasSub() ? userProfile.subUntil : 0;
-    const r = await backendPost({ action: 'pay_create', token: userToken });
+    const r = await backendPost({ action: 'pay_create', token: userToken, provider });
     if (!r || !r.ok) {
-      out.innerHTML = `<div class="text-xs" style="color:#B4506E">${esc(PAY_ERRORS[r && r.error] || 'Не удалось создать счёт. Попробуйте позже.')}</div>`;
+      out.innerHTML = `<div class="text-xs" style="color:#B4506E">${esc(payErrorText(r && r.error))}</div>`;
       return;
     }
     out.innerHTML = `
-      <a href="${esc(r.url)}" target="_blank" rel="noopener" class="btn v-main rounded-xl py-2.5 px-4 text-xs inline-flex items-center gap-2"><span class="ico">💳</span> Открыть Crypto Bot и оплатить</a>
+      <a href="${esc(r.url)}" target="_blank" rel="noopener" class="btn v-main rounded-xl py-2.5 px-4 text-xs inline-flex items-center gap-2"><span class="ico">${PROV[r.provider || provider] ? PROV[r.provider || provider].icon : '💳'}</span> Открыть ${PROV[r.provider || provider] ? PROV[r.provider || provider].label : 'оплату'} и оплатить</a>
       <div class="text-[11px] muted mt-2">После оплаты доступ откроется сам — эту страницу можно не закрывать.</div>`;
     startPayPoll();
   } catch (err) {
@@ -1398,9 +1421,9 @@ function renderPaywall() {
     <div class="glass-panel rounded-3xl p-8 text-center day-card-animate max-w-xl mx-auto w-full">
       <div class="text-4xl mb-3">🔒</div>
       <h2 class="text-xl mb-2">Доступ по подписке</h2>
-      <p class="text-sm muted mb-5">Стоимость — <strong>${esc(priceLabel())}</strong> за ${paidSettings.days || 30} дн. Оплата через Crypto Bot: USDT, TON и другие монеты.</p>
+      <p class="text-sm muted mb-5">Стоимость — <strong>${esc(priceLabel())}</strong> за ${paidSettings.days || 30} дн. Оплата через ${esc(payProviders().map(p => PROV[p].label).join(' или '))}: USDT, TON и другие монеты.</p>
       ${logged ? `
-        <button id="pw-pay" type="button" class="btn v-main rounded-xl py-3 px-5 text-sm"><span class="ico">💳</span> Оплатить ${esc(priceLabel())}</button>
+        <div id="pw-btns" class="flex flex-col sm:flex-row gap-2 justify-center">${payButtonsHtml('py-3 px-5 text-sm')}</div>
         <div id="pw-out" class="mt-3"></div>
         <button id="pw-check" type="button" class="btn v-soft rounded-xl py-2 px-4 text-xs mt-3"><span class="ico">🔄</span> Я уже оплатил(а) — проверить</button>
         <p class="text-[11px] muted mt-4">Вы вошли как ${esc(userProfile.name)}</p>`
@@ -1410,7 +1433,7 @@ function renderPaywall() {
     </div>`;
   const on = (id, fn) => { const el = $(id); if (el) el.addEventListener('click', fn); };
   on('pw-login', openCabinet);
-  on('pw-pay', e => payFlow(e.currentTarget, $('pw-out')));
+  if ($('pw-btns')) bindPayButtons($('pw-btns'), $('pw-out'));
   on('pw-check', async e => {
     const btn = e.currentTarget;
     setLoading(btn, true);
@@ -1432,7 +1455,9 @@ function renderCabSub() {
   $('cab-sub-text').innerHTML = active
     ? `💎 Подписка активна до <strong>${fmtDate(userProfile.subUntil)}</strong>`
     : `🔒 Подписка не активна • ${esc(priceLabel())} / ${paidSettings.days || 30} дн.`;
-  $('cab-sub-btn').innerHTML = `<span class="ico">💳</span> ${active ? 'Продлить' : 'Оплатить'} ${esc(priceLabel())}`;
+  const ps = payProviders();
+  $('cab-sub-btns').innerHTML = ps.map(p => `<button type="button" data-pay="${p}" class="btn v-main rounded-xl py-2 px-4 text-xs"><span class="ico">${PROV[p].icon}</span> ${active ? 'Продлить' : 'Оплатить'} ${ps.length > 1 ? '— ' + PROV[p].label : esc(priceLabel())}</button>`).join('');
+  bindPayButtons($('cab-sub-btns'), $('cab-sub-pay'));
   $('cab-sub-pay').innerHTML = '';
 }
 
@@ -1440,6 +1465,9 @@ function renderCabSub() {
 const PAID_ERRORS = {
   no_crypto_token: 'Сначала добавьте CRYPTO_PAY_TOKEN в «Свойства скрипта» (Apps Script) — токен из @CryptoBot → Crypto Pay.',
   no_courses: 'На сервере нет списка курсов. Сохраните хотя бы один курс и повторите.',
+  no_xrocket_token: 'Сначала добавьте XROCKET_PAY_TOKEN в «Свойства скрипта» — токен из @xRocket → Rocket Pay (API Version = Current).',
+  no_provider: 'Выберите хотя бы один способ оплаты.',
+  xrocket_bad_currency: 'xRocket не поддерживает выбранную валюту. Выберите другую или отключите xRocket.',
   bad_price: 'Укажите сумму больше нуля.',
   bad_currency: 'Недопустимая валюта.',
   auth: 'Сессия администратора истекла. Войдите заново.'
@@ -1451,7 +1479,11 @@ function renderPaidAdmin() {
   t.innerHTML = on ? '<span class="ico">⛔</span> Выключить платный режим' : '<span class="ico">💎</span> Включить платный режим';
   t.classList.toggle('v-rose', on);
   t.classList.toggle('v-main', !on);
-  $('paid-state').textContent = on ? `Включён • ${priceLabel()} / ${paidSettings.days || 30} дн.` : 'Выключен — сайт бесплатный';
+  const en = paidSettings.enabled || ['cryptobot'], rd = paidSettings.ready || {};
+  $('paid-prov-cryptobot').checked = en.includes('cryptobot');
+  $('paid-prov-xrocket').checked = en.includes('xrocket');
+  $('paid-prov-note').textContent = [!rd.cryptobot && 'CRYPTO_PAY_TOKEN не задан', !rd.xrocket && 'XROCKET_PAY_TOKEN не задан'].filter(Boolean).join(' • ');
+  $('paid-state').textContent = on ? `Включён • ${priceLabel()} / ${paidSettings.days || 30} дн. • ${payProviders().map(p => PROV[p].label).join(', ')}` : 'Выключен — сайт бесплатный';
   if (document.activeElement !== $('paid-price')) $('paid-price').value = paidSettings.price || '';
   if (paidSettings.currency) $('paid-currency').value = paidSettings.currency;
 }
@@ -1463,10 +1495,12 @@ function paidFeedback(msg, ok) {
 async function savePaidMode(nextPaid, btn) {
   const price = parseFloat(String($('paid-price').value).replace(',', '.'));
   if (!(price > 0)) return paidFeedback(PAID_ERRORS.bad_price, false);
+  const providers = ['cryptobot', 'xrocket'].filter(p => $('paid-prov-' + p).checked);
+  if (nextPaid && !providers.length) return paidFeedback(PAID_ERRORS.no_provider, false);
   setLoading(btn, true);
   try {
     if (nextPaid) await persistCourses();   // чтобы список курсов уже лежал на сервере
-    const r = await backendPost({ action: 'settings', token: getToken(), paid: nextPaid, price, currency: $('paid-currency').value });
+    const r = await backendPost({ action: 'settings', token: getToken(), paid: nextPaid, price, currency: $('paid-currency').value, providers });
     if (!r || !r.ok) {
       if (r && r.error === 'auth') { setAdmin(false); closeModal($('admin-modal')); }
       return paidFeedback(PAID_ERRORS[r && r.error] || 'Не удалось сохранить настройки.', false);
@@ -1680,7 +1714,6 @@ document.addEventListener('DOMContentLoaded', () => {
     $('paid-toggle-btn').addEventListener('click', e => savePaidMode(!paidSettings.paid, e.currentTarget));
     $('paid-save-btn').addEventListener('click', e => savePaidMode(paidSettings.paid, e.currentTarget));
   }
-  $('cab-sub-btn').addEventListener('click', e => payFlow(e.currentTarget, $('cab-sub-pay')));
 
   // --- Личный кабинет ---
   const cabinetModal = $('cabinet-modal');
