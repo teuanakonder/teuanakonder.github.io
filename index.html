@@ -634,7 +634,7 @@ const credentialsValid = (login, pass) => sha256(AUTH_SALT + login.trim().toLowe
    Хранит общий список курсов и сам определяет группы по вкладкам таблиц — для ВСЕХ пользователей.
    Инструкция по развёртыванию — в файле backend/Code.gs. Вставьте сюда адрес веб-приложения (…/exec).
    Если оставить пустым — сайт работает по-старому, без общего хранилища. */
-const BACKEND_URL = '';
+const BACKEND_URL = 'https://script.google.com/macros/s/AKfycbyiEubiPp6TsZ6tDJ3InuKQrPx2a8zeVsM8cagKkAQc76mQn4vhRynyxt6sDIn_BS24/exec';
 const STORAGE_KEY_TOKEN = 'schedule_portal_admin_token';
 const STORAGE_KEY_REMOTE = 'schedule_portal_remote_cfg_v1';
 
